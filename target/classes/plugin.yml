@@ -1,0 +1,32 @@
+name: Peek
+version: '1.0'
+main: ict.minesunshineone.peek.PeekPlugin
+api-version: '1.20'
+author: MineSunshineOne
+description: 一个允许玩家临时观察其他玩家的插件
+
+commands:
+  peek:
+    description: 观察其他玩家
+    usage: |
+      §c用法:
+      §7/peek <玩家名> §f- 观察指定玩家
+      §7/peek exit §f- 退出观察模式
+      §7/peek msg <消息> §f- 发送观察邀请消息
+      §7/peek stats §f- 查看个人观察统计
+    permission: peek.use
+    permission-message: §c你没有权限使用此命令！
+
+permissions:
+  peek.use:
+    description: 允许使用peek命令
+    default: op
+  peek.msg:
+    description: 允许发送观察邀请消息
+    default: true
+  peek.nocooldown:
+    description: 允许绕过冷却时间限制
+    default: op
+  peek.stats:
+    description: 允许查看观察统计信息
+    default: true 

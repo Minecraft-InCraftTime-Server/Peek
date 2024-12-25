@@ -1,0 +1,68 @@
+# Peek插件配置文件
+
+# 消息语言 (en_US 或 zh_CN)
+language: zh_CN
+
+# 最大观察时间（秒，0表示无限制）
+max-peek-duration: 300
+
+# 冷却时间设置（秒）
+cooldowns:
+  peek: 30      # 观察指令冷却时间
+  msg: 60       # 消息广播冷却时间
+
+# 统计设置
+statistics:
+  enabled: true           # 是否启用统计
+  save-interval: 300      # 统计保存间隔（秒）
+
+# 声音提示设置
+sounds:
+  # 开始被观察时的声音
+  start-peek: BLOCK_NOTE_BLOCK_PLING
+  # 结束被观察时的声音
+  end-peek: BLOCK_NOTE_BLOCK_BASS
+  # 冷却中的声音
+  cooldown: ENTITY_VILLAGER_NO
+
+# 消息配置
+messages:
+  zh_CN:
+    command-player-only: "§c该命令只能由玩家执行！"
+    no-permission: "§c你没有权限使用此命令！"
+    usage: "§c用法: /peek <玩家名> 或 /peek exit 或 /peek msg <消息>"
+    already-peeking: "§c你已经在观察模式中！请先使用 /peek exit 退出。"
+    player-not-found: "§c找不到玩家 {player}！"
+    cannot-peek-self: "§c你不能观察自己！"
+    peek-start: "§a你正在观察 {player}。使用 /peek exit ��出观察模式。"
+    not-peeking: "§c你当前不在观察模式中！"
+    peek-end: "§a已退出观察模式并返回原位置。"
+    target-offline: "§c你观察的玩家已下线，已强制退出观察模式。"
+    gamemode-changed: "§c由于游戏模式被改变，已强制退出观察模式。"
+    time-expired: "§c观察时间已到，已自动退出观察模式。"
+    being-peeked: "§e{player} 正在观察你"
+    action-bar: "§e当前有 {count} 名玩家正在观察你"
+    msg-broadcast: "§e{player} 邀请你观察: §f{message} §7[点击观察]"
+    msg-no-message: "§c请输入要发送的消息！"
+    cooldown-peek: "§c观察指令正在冷却中，还需等待 {time} 秒"
+    cooldown-msg: "§c消息广播正在冷却中，还需等待 {time} 秒"
+    stats-self: "§e你的观察统计：\n§7- 观察次数：§f{peek_count}\n§7- 被观察次数：§f{peeked_count}\n§7- 总观察时长：§f{peek_duration}分钟"
+    target-no-permission: "§c该玩家不允许被观察！"
+
+# 权限检查设置
+permissions:
+  check-target: true       # 是否检查目标玩家的权限
+  target-permission: peek.target  # 目标玩家需要的权限
+
+# 调试模式设置
+debug: false
+
+# 性能设置
+performance:
+  async-save: true    # 是否异步保存统计数据
+  save-interval: 300  # 统计数据保存间隔（秒）
+
+# 功能限制
+limits:
+  max-observers: 5    # 单个玩家最大观察者数量
+  min-cooldown: 10    # 最小冷却时间（秒）
