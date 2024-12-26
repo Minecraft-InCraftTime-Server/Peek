@@ -19,6 +19,7 @@ public class PeekPlugin extends JavaPlugin {
     private boolean checkTargetPermission;
     private boolean debug;
     private PeekCommand peekCommand;
+    private OfflinePeekManager offlinePeekManager;
 
     @Override
     public void onEnable() {
@@ -44,6 +45,8 @@ public class PeekPlugin extends JavaPlugin {
 
         // 注册事件监听器
         getServer().getPluginManager().registerEvents(new PeekListener(this, peekCommand), this);
+
+        offlinePeekManager = new OfflinePeekManager(this);
 
         getLogger().info("Peek插件已启用！");
     }
@@ -124,5 +127,9 @@ public class PeekPlugin extends JavaPlugin {
 
     public boolean isDebugEnabled() {
         return debug;
+    }
+
+    public OfflinePeekManager getOfflinePeekManager() {
+        return offlinePeekManager;
     }
 }

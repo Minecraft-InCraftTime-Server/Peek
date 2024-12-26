@@ -1,0 +1,14 @@
+# 离线观察状态文件
+/*  格式
+550e8400-e29b-41d4-a716-446655440000:
+  playerName: Steve
+  location:
+    world: world
+    x: 100.5
+    y: 64.0
+    z: -200.5
+    yaw: 90.0
+    pitch: 0.0
+  gamemode: SURVIVAL
+  startTime: 1616161616161
+*/

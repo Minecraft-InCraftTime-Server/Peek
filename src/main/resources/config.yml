@@ -49,6 +49,7 @@ messages:
     gamemode-force-exit: "&b&l[ICT] &f>> &c由于游戏模式改变，魔法效果被迫解除啦！"
     too-many-observers: "&b&l[ICT] &f>> &d这位玩家已经被太多魔法师关注啦，等会儿再来吧~"
     peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
+    peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
 
 # 权限检查设置
 permissions:

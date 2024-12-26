@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
@@ -75,6 +76,12 @@ public class PeekListener implements Listener {
                 peekCommand.handleExit(player);
             });
         }
+
+        if (peekCommand.getPeekingPlayers().containsKey(player)) {
+            PeekData data = peekCommand.getPeekingPlayers().get(player);
+            // 保存离线数据
+            plugin.getOfflinePeekManager().saveOfflinePlayerState(player, data);
+        }
     }
 
     /**
@@ -94,5 +101,11 @@ public class PeekListener implements Listener {
                 });
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        plugin.getOfflinePeekManager().checkAndRestorePlayer(player);
     }
 }
