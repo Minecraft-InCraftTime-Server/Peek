@@ -1,8 +1,10 @@
 package ict.minesunshineone.peek;
 
+import java.util.HashMap;
 import java.util.Objects;
 
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -16,6 +18,7 @@ public class PeekPlugin extends JavaPlugin {
     private CooldownManager cooldownManager;
     private boolean checkTargetPermission;
     private boolean debug;
+    private PeekCommand peekCommand;
 
     @Override
     public void onEnable() {
@@ -32,7 +35,7 @@ public class PeekPlugin extends JavaPlugin {
         }
 
         // 创建命令执行器实例
-        PeekCommand peekCommand = new PeekCommand(this);
+        peekCommand = new PeekCommand(this);
 
         // 注册命令
         PluginCommand peekCmd = Objects.requireNonNull(getCommand("peek"), "命令'peek'未在plugin.yml中注册");
@@ -47,9 +50,45 @@ public class PeekPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // 结束所有玩家的观察状态
+        if (peekCommand != null) {
+            new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {
+                if (player.isOnline()) {
+                    try {
+                        // 直接设置游戏模式
+                        player.setGameMode(data.getOriginalGameMode());
+                        // 同步传送
+                        player.teleport(data.getOriginalLocation());
+
+                        // 记录观察时长
+                        if (statistics != null) {
+                            long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
+                            statistics.recordPeekDuration(player, duration);
+                        }
+
+                        // 发送消息
+                        player.sendMessage(messages.get("peek-end"));
+
+                        // 如果目标玩家在线，也发送消息给他们
+                        Player target = data.getTargetPlayer();
+                        if (target != null && target.isOnline()) {
+                            target.sendMessage(messages.get("peek-end-target",
+                                    "player", player.getName()));
+                        }
+                    } catch (Exception e) {
+                        getLogger().warning(String.format("无法在关服时处理玩家 %s 的观察状态: %s", player.getName(), e.getMessage()));
+                    }
+                }
+            });
+            // 清空观察列表
+            peekCommand.getPeekingPlayers().clear();
+        }
+
+        // 保存统计数据
         if (statistics != null) {
             statistics.saveStats();
         }
+
         getLogger().info("Peek插件已禁用！");
     }
 
