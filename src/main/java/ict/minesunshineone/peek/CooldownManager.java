@@ -9,29 +9,20 @@ import org.bukkit.entity.Player;
 public class CooldownManager {
 
     private final Map<UUID, Long> peekCooldowns = new HashMap<>();
-    private final Map<UUID, Long> msgCooldowns = new HashMap<>();
     private final int peekCooldown;
-    private final int msgCooldown;
+    private final PeekPlugin plugin;
 
     public CooldownManager(PeekPlugin plugin) {
+        this.plugin = plugin;
         this.peekCooldown = plugin.getConfig().getInt("cooldowns.peek", 30);
-        this.msgCooldown = plugin.getConfig().getInt("cooldowns.msg", 60);
     }
 
     public boolean checkPeekCooldown(Player player) {
         return checkCooldown(player, peekCooldowns, peekCooldown);
     }
 
-    public boolean checkMsgCooldown(Player player) {
-        return checkCooldown(player, msgCooldowns, msgCooldown);
-    }
-
     public int getRemainingPeekCooldown(Player player) {
         return getRemainingCooldown(player, peekCooldowns);
-    }
-
-    public int getRemainingMsgCooldown(Player player) {
-        return getRemainingCooldown(player, msgCooldowns);
     }
 
     private boolean checkCooldown(Player player, Map<UUID, Long> cooldowns, int cooldownTime) {
@@ -65,5 +56,10 @@ public class CooldownManager {
         long now = System.currentTimeMillis();
         long diff = (lastUsage + peekCooldown * 1000L - now) / 1000L;
         return diff > 0 ? (int) diff : 0;
+    }
+
+    public void setCooldown(Player player) {
+        int configuredCooldown = plugin.getConfig().getInt("cooldowns.peek", 30);
+        peekCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + (configuredCooldown * 1000L));
     }
 }

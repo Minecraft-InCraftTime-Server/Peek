@@ -13,6 +13,7 @@ public class PeekData {
     private final GameMode originalGameMode;  // 玩家开始观察前的游戏模式
     private final Player targetPlayer;        // 被观察的目标玩家
     private final long startTime;
+    private boolean exiting = false;  // 新增字段
 
     public PeekData(Location originalLocation, GameMode originalGameMode, Player targetPlayer, long startTime) {
         this.originalLocation = originalLocation;
@@ -44,5 +45,13 @@ public class PeekData {
 
     public long getStartTime() {
         return startTime;
+    }
+
+    public boolean isExiting() {
+        return exiting;
+    }
+
+    public void setExiting(boolean exiting) {
+        this.exiting = exiting;
     }
 }

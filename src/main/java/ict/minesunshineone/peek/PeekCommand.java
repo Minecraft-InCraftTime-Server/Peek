@@ -1,7 +1,6 @@
 package ict.minesunshineone.peek;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,14 +13,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
-
-import net.kyori.adventure.text.Component;
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.HoverEvent;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.chat.hover.content.Text;
 
 /**
  * 处理/peek命令的执行器类
@@ -41,12 +33,11 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
             @NotNull String label, String[] args) {
-        // 添加命令执行时间统计
         long startTime = System.currentTimeMillis();
 
         try {
             if (!(sender instanceof Player)) {
-                sender.sendMessage(plugin.getMessages().get("command-player-only"));
+                sendMessage(sender, "command-player-only");
                 return true;
             }
 
@@ -54,24 +45,19 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
             // 检查权限
             if (!player.hasPermission("peek.use")) {
-                player.sendMessage(plugin.getMessages().get("no-permission"));
+                sendMessage(player, "no-permission");
                 return true;
             }
 
             // 检查参数
             if (args.length == 0) {
-                player.sendMessage(plugin.getMessages().get("usage"));
+                sendMessage(player, "usage");
                 return true;
             }
 
             // 处理退出命令
             if (args[0].equalsIgnoreCase("exit")) {
                 return handleExit(player);
-            }
-
-            // 处理消息发送命令
-            if (args[0].equalsIgnoreCase("msg")) {
-                return handleMessage(player, args);
             }
 
             // 处理统计命令
@@ -83,7 +69,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             return handlePeek(player, args[0]);
         } catch (Exception e) {
             plugin.getLogger().severe(String.format("执行peek命令时发生错误: %s", e.getMessage()));
-            sender.sendMessage("§c执行命令时发生错误，请联系管理员查看日志。");
+            sendMessage(sender, "command-error");
         } finally {
             if (plugin.isDebugEnabled()) {
                 long duration = System.currentTimeMillis() - startTime;
@@ -104,7 +90,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         // 检查冷却时间
         if (!plugin.getCooldownManager().checkPeekCooldown(player)) {
             int remaining = plugin.getCooldownManager().getRemainingPeekCooldown(player);
-            player.sendMessage(plugin.getMessages().get("cooldown-peek", "time", String.valueOf(remaining)));
+            sendMessage(player, "cooldown-peek", "time", String.valueOf(remaining));
             player.playSound(player.getLocation(),
                     Sound.valueOf(plugin.getConfig().getString("sounds.cooldown", "ENTITY_VILLAGER_NO")),
                     1.0f, 1.0f);
@@ -113,69 +99,26 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
         // 检查玩家是否已经在偷窥中
         if (peekingPlayers.containsKey(player)) {
-            player.sendMessage(plugin.getMessages().get("already-peeking"));
+            sendMessage(player, "already-peeking");
             return true;
         }
 
         // 获取目标玩家
         Player target = plugin.getServer().getPlayer(targetName);
         if (target == null) {
-            player.sendMessage(plugin.getMessages().get("player-not-found", "player", targetName));
+            sendMessage(player, "player-not-found", "player", targetName);
             return true;
         }
 
         // 不能偷窥自己
         if (target == player) {
-            player.sendMessage(plugin.getMessages().get("cannot-peek-self"));
+            sendMessage(player, "cannot-peek-self");
             return true;
-        }
-
-        // 记录观察开始
-        if (plugin.getStatistics() != null) {
-            plugin.getStatistics().recordPeekStart(player, target);
-        }
-
-        // 存储开始时间
-        long startTime = System.currentTimeMillis();
-        PeekData peekData = new PeekData(
-                player.getLocation().clone(),
-                player.getGameMode(),
-                target,
-                startTime
-        );
-        peekingPlayers.put(player, peekData);
-
-        // 切换到观察模式并传送
-        player.setGameMode(GameMode.SPECTATOR);
-        player.teleport(target.getLocation());
-        player.sendMessage(plugin.getMessages().get("peek-start", "player", target.getName()));
-
-        // 向目标玩家发送提示
-        target.sendMessage(plugin.getMessages().get("being-peeked", "player", player.getName()));
-        target.playSound(target.getLocation(),
-                Sound.valueOf(plugin.getConfig().getString("sounds.start-peek", "BLOCK_NOTE_BLOCK_PLING")),
-                1.0f, 1.0f);
-
-        // 更新目标玩家的观察者数量显示
-        updateActionBar(target);
-
-        // 如果设置了最大观察时间，启动定时器
-        int maxDuration = plugin.getMaxPeekDuration();
-        if (maxDuration > 0) {
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (peekingPlayers.containsKey(player)) {
-                        handleExit(player);
-                        player.sendMessage(plugin.getMessages().get("time-expired"));
-                    }
-                }
-            }.runTaskLater(plugin, maxDuration * 20L);
         }
 
         // 检查目标玩家权限
         if (plugin.isCheckTargetPermission() && !target.hasPermission("peek.target")) {
-            player.sendMessage(plugin.getMessages().get("target-no-permission"));
+            sendMessage(player, "target-no-permission");
             return true;
         }
 
@@ -186,8 +129,55 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                 .count();
 
         if (currentObservers >= maxObservers) {
-            player.sendMessage(plugin.getMessages().get("too-many-observers"));
+            sendMessage(player, "too-many-observers");
             return true;
+        }
+
+        // 记录观察开始
+        if (plugin.getStatistics() != null) {
+            plugin.getStatistics().recordPeekStart(player, target);
+        }
+
+        // 存储开始时间和数据
+        long startTime = System.currentTimeMillis();
+        PeekData peekData = new PeekData(
+                player.getLocation().clone(),
+                player.getGameMode(),
+                target,
+                startTime
+        );
+        peekingPlayers.put(player, peekData);
+
+        // 在目标玩家所在区域执行传送
+        plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
+            player.setGameMode(GameMode.SPECTATOR);
+            player.teleportAsync(target.getLocation()).thenAccept(result -> {
+                if (result) {
+                    sendMessage(player, "peek-start", "player", target.getName());
+                    sendMessage(target, "being-peeked", "player", player.getName());
+                    playSound(target, "start-peek");
+                    updateActionBar(target);
+                } else {
+                    peekingPlayers.remove(player);
+                    sendMessage(player, "teleport-failed");
+                }
+            });
+        });
+
+        // 如果设置了最大观察时间，启动定时器
+        int maxDuration = plugin.getMaxPeekDuration();
+        if (maxDuration > 0) {
+            // 将分钟转换为毫秒 (分钟 * 60 * 1000)
+            long durationInMillis = maxDuration * 60L * 1000L;
+            plugin.getServer().getAsyncScheduler().runDelayed(plugin, scheduledTask -> {
+                if (peekingPlayers.containsKey(player)) {
+                    plugin.getServer().getRegionScheduler().execute(plugin,
+                            player.getLocation(), () -> {
+                        handleExit(player);
+                        sendMessage(player, "time-expired");
+                    });
+                }
+            }, durationInMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
 
         return true;
@@ -200,31 +190,29 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
      * @return 是否执行成功
      */
     public boolean handleExit(Player player) {
-        PeekData data = peekingPlayers.remove(player);
-        if (data == null) {
-            player.sendMessage(plugin.getMessages().get("not-peeking"));
+        if (!peekingPlayers.containsKey(player)) {
+            sendMessage(player, "not-peeking");
             return true;
         }
 
-        // 记录观察时长
+        PeekData data = peekingPlayers.get(player);
+        data.setExiting(true);  // 设置退出标记
+        Player target = data.getTargetPlayer();
+
+        restorePlayerState(player, data);
+        peekingPlayers.remove(player);
+
+        sendMessage(player, "peek-end");
+        if (target != null && target.isOnline()) {
+            sendMessage(target, "peek-end-target", "player", player.getName());
+            playSound(target, "end-peek");
+        }
+
+        updateActionBar(target);
+
         if (plugin.getStatistics() != null) {
             long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
             plugin.getStatistics().recordPeekDuration(player, duration);
-        }
-
-        Player target = data.getTargetPlayer();
-        // 恢复始状态
-        player.setGameMode(data.getOriginalGameMode());
-        player.teleport(data.getOriginalLocation());
-        player.sendMessage(plugin.getMessages().get("peek-end"));
-
-        // 播放结束观察的声音
-        if (target.isOnline()) {
-            target.playSound(target.getLocation(),
-                    Sound.valueOf(plugin.getConfig().getString("sounds.end-peek", "BLOCK_NOTE_BLOCK_BASS")),
-                    1.0f, 1.0f);
-            // 更新目标玩家的观察者数量显示
-            updateActionBar(target);
         }
 
         return true;
@@ -241,7 +229,8 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         if (count > 0) {
             String message = plugin.getMessages().get("action-bar", "count", String.valueOf(count));
             if (message != null) {
-                target.sendActionBar(Component.text(message));
+                target.sendActionBar(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                        .legacyAmpersand().deserialize(message));
             }
         }
     }
@@ -256,73 +245,20 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
-     * 处理玩家发送请消息
-     */
-    private boolean handleMessage(Player player, String[] args) {
-        // 检查权限
-        if (!player.hasPermission("peek.msg")) {
-            player.sendMessage(plugin.getMessages().get("no-permission"));
-            return true;
-        }
-
-        // 检查冷却时间
-        if (!plugin.getCooldownManager().checkMsgCooldown(player)) {
-            int remaining = plugin.getCooldownManager().getRemainingMsgCooldown(player);
-            player.sendMessage(plugin.getMessages().get("cooldown-msg", "time", String.valueOf(remaining)));
-            player.playSound(player.getLocation(),
-                    Sound.valueOf(plugin.getConfig().getString("sounds.cooldown", "ENTITY_VILLAGER_NO")),
-                    1.0f, 1.0f);
-            return true;
-        }
-
-        if (args.length < 2) {
-            player.sendMessage(plugin.getMessages().get("msg-no-message"));
-            return true;
-        }
-
-        // 拼接消息内容
-        String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-
-        // 创建可点击的消息
-        TextComponent text = new TextComponent(
-                "§e" + player.getName() + " §e邀请你观察: §f" + message + " §7[点击观察]"
-        );
-        text.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/peek " + player.getName()));
-        text.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new Text("§7点击观察 " + player.getName())));
-
-        // 广播消息并播放声音
-        plugin.getServer().getOnlinePlayers().forEach(p -> {
-            p.sendMessage(Component.text()
-                    .append(Component.text("§e" + player.getName()))
-                    .append(Component.text(" §e邀请你观察: "))
-                    .append(Component.text("§f" + message))
-                    .append(Component.text(" §7[点击观察]")
-                            .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand("/peek " + player.getName()))
-                            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(Component.text("§7点击观察 " + player.getName()))))
-                    .build());
-            if (p != player) {
-                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 1.0f);
-            }
-        });
-        return true;
-    }
-
-    /**
      * 处理查看统计信息的命令
      */
     private boolean handleStats(Player player) {
         if (plugin.getStatistics() == null) {
-            player.sendMessage("§c统计功能未启用！");
+            sendMessage(player, "stats-disabled");
             return true;
         }
 
         Statistics.PlayerStats stats = plugin.getStatistics().getStats(player);
-        player.sendMessage(plugin.getMessages().get("stats-self",
+        sendMessage(player, "stats-self",
                 "peek_count", String.valueOf(stats.getPeekCount()),
                 "peeked_count", String.valueOf(stats.getPeekedCount()),
                 "peek_duration", String.valueOf(stats.getPeekDuration() / 60)
-        ));
+        );
         return true;
     }
 
@@ -337,8 +273,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             completions.add("exit");
-            completions.add("msg");
-            completions.add("stats");  // 添加统计命令补全
+            completions.add("stats");
             // 添加在线玩家名称
             completions.addAll(plugin.getServer().getOnlinePlayers().stream()
                     .map(Player::getName)
@@ -350,5 +285,41 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         }
 
         return null;
+    }
+
+    private void restorePlayerState(Player player, PeekData data) {
+        plugin.getServer().getRegionScheduler().execute(plugin, player.getLocation(), () -> {
+            player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
+                if (result) {
+                    player.setGameMode(data.getOriginalGameMode());
+                }
+            });
+        });
+    }
+
+    private void playSound(Player player, String soundKey) {
+        if (player != null) {
+            player.playSound(player.getLocation(),
+                    Sound.valueOf(plugin.getConfig().getString("sounds." + soundKey, "BLOCK_NOTE_BLOCK_PLING")),
+                    1.0f, 1.0f);
+        }
+    }
+
+    private void sendMessage(CommandSender sender, String key, String... replacements) {
+        if (sender == null || key == null) {
+            return;
+        }
+
+        String message = plugin.getMessages().get(key, replacements);
+        if (message == null) {
+            return;
+        }
+
+        if (sender instanceof Player player) {
+            player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                    .legacyAmpersand().deserialize(message));
+        } else {
+            sender.sendMessage(message);
+        }
     }
 }

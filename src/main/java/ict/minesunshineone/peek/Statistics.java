@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class Statistics {
 
@@ -19,7 +18,7 @@ public class Statistics {
 
     public Statistics(PeekPlugin plugin) {
         this.plugin = plugin;
-        this.statsFile = new File(plugin.getDataFolder(), "statistics.yml");
+        this.statsFile = new File(plugin.getDataFolder(), "stats.yml");
         loadStats();
         startAutoSave();
     }
@@ -40,43 +39,30 @@ public class Statistics {
     }
 
     public void saveStats() {
-        if (plugin.getConfig().getBoolean("performance.async-save", true)) {
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    saveStatsToFile();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
+            try {
+                YamlConfiguration config = new YamlConfiguration();
+                for (Map.Entry<UUID, PlayerStats> entry : stats.entrySet()) {
+                    String path = entry.getKey().toString();
+                    PlayerStats playerStats = entry.getValue();
+                    config.set(path + ".peek_count", playerStats.getPeekCount());
+                    config.set(path + ".peeked_count", playerStats.getPeekedCount());
+                    config.set(path + ".peek_duration", playerStats.getPeekDuration());
                 }
-            }.runTaskAsynchronously(plugin);
-        } else {
-            saveStatsToFile();
-        }
-    }
-
-    private void saveStatsToFile() {
-        FileConfiguration config = new YamlConfiguration();
-        for (Map.Entry<UUID, PlayerStats> entry : stats.entrySet()) {
-            String path = entry.getKey().toString();
-            PlayerStats playerStats = entry.getValue();
-            config.set(path + ".peek_count", playerStats.getPeekCount());
-            config.set(path + ".peeked_count", playerStats.getPeekedCount());
-            config.set(path + ".peek_duration", playerStats.getPeekDuration());
-        }
-
-        try {
-            config.save(statsFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning(String.format("无法保存统计数据: %s", e.getMessage()));
-        }
+                config.save(statsFile);
+            } catch (IOException e) {
+                plugin.getLogger().warning(String.format("无法保存统计数据: %s", e.getMessage()));
+            }
+        });
     }
 
     private void startAutoSave() {
         int interval = plugin.getConfig().getInt("statistics.save-interval", 300);
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                saveStats();
-            }
-        }.runTaskTimer(plugin, interval * 20L, interval * 20L);
+        plugin.getServer().getAsyncScheduler().runAtFixedRate(plugin,
+                task -> saveStats(),
+                interval * 20L,
+                interval * 20L,
+                java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     public void recordPeekStart(Player peeker, Player target) {

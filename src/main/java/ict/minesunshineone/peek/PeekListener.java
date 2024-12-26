@@ -1,13 +1,13 @@
 package ict.minesunshineone.peek;
 
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.scheduler.BukkitRunnable;
 
 /**
  * 处理与观察模式相关的事件监听器
@@ -30,13 +30,13 @@ public class PeekListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Player player = event.getPlayer();
-                handlePlayerQuit(player);
-            }
-        }.runTaskAsynchronously(plugin);
+        Player player = event.getPlayer();
+        Location location = player.getLocation();
+
+        // 使用区域调度器来处理玩家退出
+        plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
+            handlePlayerQuit(player);
+        });
     }
 
     private void handlePlayerQuit(Player player) {
@@ -51,8 +51,13 @@ public class PeekListener implements Listener {
                     long duration = (quitTime - entry.getValue().getStartTime()) / 1000;
                     plugin.getStatistics().recordPeekDuration(peeker, duration);
                 }
-                peekCommand.handleExit(peeker);
-                peeker.sendMessage(plugin.getMessages().get("target-offline"));
+
+                // 在正确的区域执行传送
+                plugin.getServer().getRegionScheduler().execute(plugin,
+                        peeker.getLocation(), () -> {
+                    peekCommand.handleExit(peeker);
+                    peeker.sendMessage(plugin.getMessages().get("target-offline"));
+                });
                 return true;
             }
             return false;
@@ -60,13 +65,15 @@ public class PeekListener implements Listener {
 
         // 如果退出的玩家正在观察别人，强制退出观察模式
         if (peekCommand.getPeekingPlayers().containsKey(player)) {
-            // 记录观察时长
             PeekData data = peekCommand.getPeekingPlayers().get(player);
             if (plugin.getStatistics() != null) {
                 long duration = (quitTime - data.getStartTime()) / 1000;
                 plugin.getStatistics().recordPeekDuration(player, duration);
             }
-            peekCommand.handleExit(player);
+            plugin.getServer().getRegionScheduler().execute(plugin,
+                    player.getLocation(), () -> {
+                peekCommand.handleExit(player);
+            });
         }
     }
 
@@ -76,11 +83,15 @@ public class PeekListener implements Listener {
     @EventHandler
     public void onGameModeChange(PlayerGameModeChangeEvent event) {
         Player player = event.getPlayer();
+        Location location = player.getLocation();
+
         if (peekCommand.getPeekingPlayers().containsKey(player)) {
-            // 如果是管理员改变游戏模式（而不是插件内部改变）
-            if (!event.getNewGameMode().equals(GameMode.SPECTATOR)) {
-                peekCommand.handleExit(player);
-                player.sendMessage("§c由于游戏模式被改变，已强制退出观察模式。");
+            PeekData data = peekCommand.getPeekingPlayers().get(player);
+            if (!event.getNewGameMode().equals(GameMode.SPECTATOR) && !data.isExiting()) {
+                plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
+                    peekCommand.handleExit(player);
+                    player.sendMessage(plugin.getMessages().get("gamemode-force-exit"));
+                });
             }
         }
     }

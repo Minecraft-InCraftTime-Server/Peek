@@ -3,18 +3,17 @@
 # 消息语言 (en_US 或 zh_CN)
 language: zh_CN
 
-# 最大观察时间（秒，0表示无限制）
-max-peek-duration: 300
+# 最大观察时间（分钟，0表示无限制）
+max-peek-duration: 5
 
 # 冷却时间设置（秒）
 cooldowns:
   peek: 30      # 观察指令冷却时间
-  msg: 60       # 消息广播冷却时间
 
 # 统计设置
 statistics:
   enabled: true           # 是否启用统计
-  save-interval: 300      # 统计保存间隔（秒）
+  save-interval: 600      # 统计保存间隔（秒）
 
 # 声音提示设置
 sounds:
@@ -28,26 +27,28 @@ sounds:
 # 消息配置
 messages:
   zh_CN:
-    command-player-only: "§c该命令只能由玩家执行！"
-    no-permission: "§c你没有权限使用此命令！"
-    usage: "§c用法: /peek <玩家名> 或 /peek exit 或 /peek msg <消息>"
-    already-peeking: "§c你已经在观察模式中！请先使用 /peek exit 退出。"
-    player-not-found: "§c找不到玩家 {player}！"
-    cannot-peek-self: "§c你不能观察自己！"
-    peek-start: "§a你正在观察 {player}。使用 /peek exit ��出观察模式。"
-    not-peeking: "§c你当前不在观察模式中！"
-    peek-end: "§a已退出观察模式并返回原位置。"
-    target-offline: "§c你观察的玩家已下线，已强制退出观察模式。"
-    gamemode-changed: "§c由于游戏模式被改变，已强制退出观察模式。"
-    time-expired: "§c观察时间已到，已自动退出观察模式。"
-    being-peeked: "§e{player} 正在观察你"
-    action-bar: "§e当前有 {count} 名玩家正在观察你"
-    msg-broadcast: "§e{player} 邀请你观察: §f{message} §7[点击观察]"
-    msg-no-message: "§c请输入要发送的消息！"
-    cooldown-peek: "§c观察指令正在冷却中，还需等待 {time} 秒"
-    cooldown-msg: "§c消息广播正在冷却中，还需等待 {time} 秒"
-    stats-self: "§e你的观察统计：\n§7- 观察次数：§f{peek_count}\n§7- 被观察次数：§f{peeked_count}\n§7- 总观察时长：§f{peek_duration}分钟"
-    target-no-permission: "§c该玩家不允许被观察！"
+    command-player-only: "&b&l[ICT] &f>> &d这个指令只能由玩家使用"
+    no-permission: "&b&l[ICT] &f>> &d你没有权限使用这个指令"
+    usage: "&b&l[ICT] &f>> &d用法: &f/peek <玩家名> &7或 &f/peek exit"
+    already-peeking: "&b&l[ICT] &f>> &d你已经在观察别人了&f，用 &f/peek exit &d退出"
+    player-not-found: "&b&l[ICT] &f>> &d找不到玩家 &f{player}"
+    cannot-peek-self: "&b&l[ICT] &f>> &d不能&f观察&d自己"
+    peek-start: "&b&l[ICT] &f>> &d开始观察 &f{player}&d，使用 &f/peek exit &d结束"
+    not-peeking: "&b&l[ICT] &f>> &d你没有在观察任何人"
+    peek-end: "&b&l[ICT] &f>> &d已&f结束&d观察"
+    target-offline: "&b&l[ICT] &f>> &d目标玩家已下线，退出观察"
+    time-expired: "&b&l[ICT] &f>> &d观察时间已到"
+    being-peeked: "&b&l[ICT] &f>> &d玩家 &f{player} &d正在观察你"
+    action-bar: "&d当前有 &f{count} &d位玩家在观察你"
+    cooldown-peek: "&b&l[ICT] &f>> &d指令还在冷却中啦，再等 &f{time} &d秒就可以用了哦"
+    stats-self: "&b&l[ICT] &f>> &d你的观察统计：\n&d➤ 观察次数：&f{peek_count}\n&d➤ 被观察次数：&f{peeked_count}\n&d➤ 总观察时长：&f{peek_duration}&d分钟"
+    target-no-permission: "&b&l[ICT] &f>> &d这位玩家不想被观察呢，要尊重他人的隐私"
+    command-error: "&b&l[ICT] &f>> &c执行命令时发生错误，请联系管理员查看日志"
+    teleport-failed: "&b&l[ICT] &f>> &c返回原位置失败"
+    stats-disabled: "&b&l[ICT] &f>> &c统计功能未启用"
+    gamemode-force-exit: "&b&l[ICT] &f>> &c由于游戏模式被改变，已强制退出观察模式"
+    too-many-observers: "&b&l[ICT] &f>> &d这个玩家的观察者已经太多了"
+    peek-end-target: "&b&l[ICT] &f>> &d玩家 &f{player} &d结束了观察"
 
 # 权限检查设置
 permissions:
@@ -60,9 +61,8 @@ debug: false
 # 性能设置
 performance:
   async-save: true    # 是否异步保存统计数据
-  save-interval: 300  # 统计数据保存间隔（秒）
+  save-interval: 600  # 统计数据保存间隔（秒）
 
 # 功能限制
 limits:
   max-observers: 5    # 单个玩家最大观察者数量
-  min-cooldown: 10    # 最小冷却时间（秒）

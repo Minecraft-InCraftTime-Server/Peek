@@ -55,12 +55,14 @@ public class Messages {
      * @return 替换后的消息
      */
     public String get(String key, String... replacements) {
-        String message = get(key);
+        String message = messages.getOrDefault(key, "Missing message: " + key);
         for (int i = 0; i < replacements.length; i += 2) {
             if (i + 1 < replacements.length) {
                 message = message.replace("{" + replacements[i] + "}", replacements[i + 1]);
             }
         }
-        return message;
+        return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand().serialize(
+                net.kyori.adventure.text.Component.text(message)
+        );
     }
 }
