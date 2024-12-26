@@ -28,3 +28,5 @@ permissions:
   peek.stats:
     description: 允许查看观察统计信息
     default: true 
+
+softdepend: [PlaceholderAPI] 

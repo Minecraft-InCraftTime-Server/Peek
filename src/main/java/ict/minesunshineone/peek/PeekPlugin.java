@@ -48,6 +48,11 @@ public class PeekPlugin extends JavaPlugin {
 
         offlinePeekManager = new OfflinePeekManager(this);
 
+        // 如果服务器安装了 PlaceholderAPI,注册变量
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new PeekPlaceholderExpansion(this).register();
+        }
+
         getLogger().info("Peek插件已启用！");
     }
 

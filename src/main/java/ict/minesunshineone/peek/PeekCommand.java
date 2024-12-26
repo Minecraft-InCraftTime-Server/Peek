@@ -256,7 +256,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         sendMessage(player, "stats-self",
                 "peek_count", String.valueOf(stats.getPeekCount()),
                 "peeked_count", String.valueOf(stats.getPeekedCount()),
-                "peek_duration", String.valueOf(stats.getPeekDuration() / 60)
+                "peek_duration", String.format("%.1f", stats.getPeekDuration() / 60.0)
         );
         return true;
     }
