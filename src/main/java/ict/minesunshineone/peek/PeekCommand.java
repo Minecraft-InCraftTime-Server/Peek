@@ -164,11 +164,9 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             });
         });
 
-        // 如果设置了最大观察时间，启动定时器
-        int maxDuration = plugin.getMaxPeekDuration();
-        if (maxDuration > 0) {
-            // 将分钟转换为毫秒 (分钟 * 60 * 1000)
-            long durationInMillis = maxDuration * 60L * 1000L;
+        // 设置最大观察时间定时器
+        if (plugin.getMaxPeekDuration() > 0) {
+            long durationInMillis = plugin.getMaxPeekDuration() * 1000L;
             plugin.getServer().getAsyncScheduler().runDelayed(plugin, scheduledTask -> {
                 if (peekingPlayers.containsKey(player)) {
                     plugin.getServer().getRegionScheduler().execute(plugin,
