@@ -62,6 +62,9 @@ public class PeekPlugin extends JavaPlugin {
         if (peekCommand != null) {
             new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {
                 if (player.isOnline()) {
+                    // 保存状态
+                    offlinePeekManager.saveOfflinePlayerState(player, data);
+
                     try {
                         getServer().getRegionScheduler().execute(this, player.getLocation(), () -> {
                             player.setGameMode(data.getOriginalGameMode());

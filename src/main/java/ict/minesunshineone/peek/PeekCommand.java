@@ -148,6 +148,9 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         );
         peekingPlayers.put(player, peekData);
 
+        // 立即保存状态，以防意外情况
+        plugin.getOfflinePeekManager().saveOfflinePlayerState(player, peekData);
+
         // 在目标玩家所在区域执行传送
         plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
             player.setGameMode(GameMode.SPECTATOR);
