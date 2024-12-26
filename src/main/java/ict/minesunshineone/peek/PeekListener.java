@@ -75,10 +75,6 @@ public class PeekListener implements Listener {
                     player.getLocation(), () -> {
                 peekCommand.handleExit(player);
             });
-        }
-
-        if (peekCommand.getPeekingPlayers().containsKey(player)) {
-            PeekData data = peekCommand.getPeekingPlayers().get(player);
             // 保存离线数据
             plugin.getOfflinePeekManager().saveOfflinePlayerState(player, data);
         }

@@ -160,6 +160,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                 } else {
                     peekingPlayers.remove(player);
                     sendMessage(player, "teleport-failed");
+                    plugin.getLogger().warning(String.format("玩家 %s 传送失败", player.getName()));
                 }
             });
         });

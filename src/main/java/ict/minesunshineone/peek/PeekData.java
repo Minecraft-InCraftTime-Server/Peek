@@ -16,6 +16,9 @@ public class PeekData {
     private boolean exiting = false;  // 新增字段
 
     public PeekData(Location originalLocation, GameMode originalGameMode, Player targetPlayer, long startTime) {
+        if (originalLocation == null || originalGameMode == null || targetPlayer == null) {
+            throw new IllegalArgumentException("位置、游戏模式和目标玩家不能为空");
+        }
         this.originalLocation = originalLocation;
         this.originalGameMode = originalGameMode;
         this.targetPlayer = targetPlayer;
