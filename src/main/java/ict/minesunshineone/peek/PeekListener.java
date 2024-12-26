@@ -64,7 +64,7 @@ public class PeekListener implements Listener {
             return false;
         });
 
-        // 如果退出的玩家正在观察别人，强制退出观察模式
+        // 如果退出的玩家正���观察别人，强制退出观察模式
         if (peekCommand.getPeekingPlayers().containsKey(player)) {
             PeekData data = peekCommand.getPeekingPlayers().get(player);
             if (plugin.getStatistics() != null) {
@@ -102,6 +102,9 @@ public class PeekListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        plugin.getOfflinePeekManager().checkAndRestorePlayer(player);
+        // 使用区域调度器执行恢复
+        plugin.getServer().getRegionScheduler().execute(plugin, player.getLocation(), () -> {
+            plugin.getOfflinePeekManager().checkAndRestorePlayer(player);
+        });
     }
 }

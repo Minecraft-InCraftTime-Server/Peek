@@ -63,32 +63,29 @@ public class PeekPlugin extends JavaPlugin {
             new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {
                 if (player.isOnline()) {
                     try {
-                        // 直接设置游戏模式
-                        player.setGameMode(data.getOriginalGameMode());
-                        // 同步传送
-                        player.teleport(data.getOriginalLocation());
+                        getServer().getRegionScheduler().execute(this, player.getLocation(), () -> {
+                            player.setGameMode(data.getOriginalGameMode());
+                            player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
+                                if (result && getStatistics() != null) {
+                                    long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
+                                    getStatistics().recordPeekDuration(player, duration);
+                                }
+                            });
 
-                        // 记录观察时长
-                        if (statistics != null) {
-                            long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
-                            statistics.recordPeekDuration(player, duration);
-                        }
+                            player.sendMessage(messages.get("peek-end"));
 
-                        // 发送消息
-                        player.sendMessage(messages.get("peek-end"));
-
-                        // 如果目标玩家在线，也发送消息给他们
-                        Player target = data.getTargetPlayer();
-                        if (target != null && target.isOnline()) {
-                            target.sendMessage(messages.get("peek-end-target",
-                                    "player", player.getName()));
-                        }
+                            Player target = data.getTargetPlayer();
+                            if (target != null && target.isOnline()) {
+                                target.sendMessage(messages.get("peek-end-target",
+                                        "player", player.getName()));
+                            }
+                        });
                     } catch (Exception e) {
-                        getLogger().warning(String.format("无法在关服时处理玩家 %s 的观察状态: %s", player.getName(), e.getMessage()));
+                        getLogger().warning(String.format("无法在关服时处理玩家 %s 的观察状态: %s",
+                                player.getName(), e.getMessage()));
                     }
                 }
             });
-            // 清空观察列表
             peekCommand.getPeekingPlayers().clear();
         }
 
@@ -105,7 +102,7 @@ public class PeekPlugin extends JavaPlugin {
      */
     private void loadConfig() {
         reloadConfig();
-        this.maxPeekDuration = getConfig().getInt("max-peek-duration", 300);
+        this.maxPeekDuration = getConfig().getInt("max-peek-duration", 5) * 60;
         this.checkTargetPermission = getConfig().getBoolean("permissions.check-target", true);
         this.debug = getConfig().getBoolean("debug", false);
     }
