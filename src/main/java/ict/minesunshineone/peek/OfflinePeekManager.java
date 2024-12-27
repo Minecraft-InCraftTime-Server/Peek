@@ -2,9 +2,6 @@ package ict.minesunshineone.peek;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.GameMode;
@@ -20,14 +17,6 @@ public class OfflinePeekManager {
     private YamlConfiguration pendingPeeks;
     private static final long CLEANUP_INTERVAL = 30 * 60 * 1000;
     private static final long MAX_OFFLINE_TIME = 24 * 60 * 60 * 1000;
-    private static final int CACHE_MAX_SIZE = 100;
-    private final Map<UUID, PeekData> cache = Collections.synchronizedMap(
-            new LinkedHashMap<UUID, PeekData>(CACHE_MAX_SIZE + 1, .75F, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<UUID, PeekData> eldest) {
-            return size() > CACHE_MAX_SIZE;
-        }
-    });
 
     public OfflinePeekManager(PeekPlugin plugin) {
         this.plugin = plugin;

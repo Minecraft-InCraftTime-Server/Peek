@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.bukkit.GameMode;
-import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -334,16 +333,6 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                 player.teleportAsync(data.getOriginalLocation());
             }
         });
-    }
-
-    private String formatLocation(Location loc) {
-        return String.format(
-                "世界:%s, x:%.2f, y:%.2f, z:%.2f",
-                loc.getWorld().getName(),
-                loc.getX(),
-                loc.getY(),
-                loc.getZ()
-        );
     }
 
     private void playSound(Player player, String soundKey) {
