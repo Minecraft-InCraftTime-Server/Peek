@@ -39,21 +39,21 @@ public class Statistics {
     }
 
     public void saveStats() {
-        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
-            try {
-                YamlConfiguration config = new YamlConfiguration();
-                for (Map.Entry<UUID, PlayerStats> entry : stats.entrySet()) {
-                    String path = entry.getKey().toString();
-                    PlayerStats playerStats = entry.getValue();
-                    config.set(path + ".peek_count", playerStats.getPeekCount());
-                    config.set(path + ".peeked_count", playerStats.getPeekedCount());
-                    config.set(path + ".peek_duration", playerStats.getPeekDuration());
-                }
-                config.save(statsFile);
-            } catch (IOException e) {
-                plugin.getLogger().warning(String.format("无法保存统计数据: %s", e.getMessage()));
-            }
-        });
+        FileConfiguration config = YamlConfiguration.loadConfiguration(statsFile);
+        // 保存所有统计数据
+        for (Map.Entry<UUID, PlayerStats> entry : stats.entrySet()) {
+            String uuidStr = entry.getKey().toString();
+            PlayerStats playerStats = entry.getValue();
+            config.set(uuidStr + ".peek_count", playerStats.getPeekCount());
+            config.set(uuidStr + ".peeked_count", playerStats.getPeekedCount());
+            config.set(uuidStr + ".peek_duration", playerStats.getPeekDuration());
+        }
+
+        try {
+            config.save(statsFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning(String.format("保存统计数据时发生错误: %s", e.getMessage()));
+        }
     }
 
     private void startAutoSave() {
