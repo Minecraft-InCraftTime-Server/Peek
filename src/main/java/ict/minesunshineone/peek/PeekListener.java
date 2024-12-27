@@ -2,6 +2,8 @@ package ict.minesunshineone.peek;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.entity.EnderPearl;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -9,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 
 /**
  * 处理与观察模式相关的事件监听器
@@ -64,7 +67,7 @@ public class PeekListener implements Listener {
             return false;
         });
 
-        // 如果退出的玩家正���观察别人，强制退出观察模式
+        // 如果退出的玩家正在观察别人，强制退出观察模式
         if (peekCommand.getPeekingPlayers().containsKey(player)) {
             PeekData data = peekCommand.getPeekingPlayers().get(player);
             if (plugin.getStatistics() != null) {
@@ -106,5 +109,22 @@ public class PeekListener implements Listener {
         plugin.getServer().getRegionScheduler().execute(plugin, player.getLocation(), () -> {
             plugin.getOfflinePeekManager().checkAndRestorePlayer(player);
         });
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        Player player = event.getPlayer();
+
+        // 如果玩家正在观察中且是末影珍珠传送，则取消传送并提示
+        if (peekCommand.getPeekingPlayers().containsKey(player)
+                && event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.getMessages().get("no-enderpearl-while-peeking"));
+            // 移除末影珍珠实体
+            event.getTo().getWorld().getEntities().stream()
+                    .filter(entity -> entity instanceof EnderPearl)
+                    .filter(entity -> ((EnderPearl) entity).getShooter() == player)
+                    .forEach(Entity::remove);
+        }
     }
 }

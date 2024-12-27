@@ -50,6 +50,8 @@ messages:
     too-many-observers: "&b&l[ICT] &f>> &d这位玩家已经被太多魔法师关注啦，等会儿再来吧~"
     peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
     peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
+    different-dimension: "&b&l[ICT] &f>> &d魔法似乎无法跨越维度的界限呢~"
+    no-enderpearl-while-peeking: "&c观察状态下无法使用末影珍珠传送！"
 
 # 权限检查设置
 permissions:

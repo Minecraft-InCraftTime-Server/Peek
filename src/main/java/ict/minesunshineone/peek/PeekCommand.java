@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -153,24 +154,42 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
         // 在目标玩家所在区域执行传送
         plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
-            player.setGameMode(GameMode.SPECTATOR);
-            player.teleportAsync(target.getLocation()).thenAccept(result -> {
-                if (result) {
-                    sendMessage(player, "peek-start", "player", target.getName());
-                    sendMessage(target, "being-peeked", "player", player.getName());
-                    playSound(target, "start-peek");
-                    updateActionBar(target);
-                } else {
-                    peekingPlayers.remove(player);
-                    sendMessage(player, "teleport-failed");
-                    plugin.getLogger().warning(String.format("玩家 %s 传送失败", player.getName()));
-                }
-            });
+            if (!player.getWorld().equals(target.getWorld())) {
+                // 跨维度传送，先传送再切换模式
+                player.teleportAsync(target.getLocation()).thenAccept(result -> {
+                    if (result) {
+                        // 确保在正确的维度和区域执行游戏模式切换
+                        plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
+                            player.setGameMode(GameMode.SPECTATOR);
+                            handlePeekSuccess(player, target, true);
+                        });
+                    } else {
+                        handlePeekFail(player);
+                        peekingPlayers.remove(player);
+                    }
+                });
+            } else {
+                // 同维度传送
+                player.setGameMode(GameMode.SPECTATOR);
+                player.teleportAsync(target.getLocation()).thenAccept(result -> {
+                    if (result) {
+                        handlePeekSuccess(player, target, result);
+                    } else {
+                        handlePeekFail(player);
+                        player.setGameMode(peekData.getOriginalGameMode());
+                        peekingPlayers.remove(player);
+                    }
+                });
+            }
         });
 
         // 设置最大观察时间定时器
         if (plugin.getMaxPeekDuration() > 0) {
             long durationInMillis = plugin.getMaxPeekDuration() * 1000L;
+            if (plugin.isDebugEnabled()) {
+                plugin.getLogger().info(String.format("设置观察时间限制: %d秒 (%d毫秒)",
+                        plugin.getMaxPeekDuration(), durationInMillis));
+            }
             plugin.getServer().getAsyncScheduler().runDelayed(plugin, scheduledTask -> {
                 if (peekingPlayers.containsKey(player)) {
                     plugin.getServer().getRegionScheduler().execute(plugin,
@@ -290,13 +309,41 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     private void restorePlayerState(Player player, PeekData data) {
-        plugin.getServer().getRegionScheduler().execute(plugin, player.getLocation(), () -> {
-            player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
-                if (result) {
-                    player.setGameMode(data.getOriginalGameMode());
-                }
-            });
+        plugin.getServer().getRegionScheduler().execute(plugin, data.getOriginalLocation(), () -> {
+            if (!player.getWorld().equals(data.getOriginalLocation().getWorld())) {
+                // 跨维度返回，先传送再切换模式
+                player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
+                    if (result) {
+                        plugin.getServer().getRegionScheduler().execute(plugin, data.getOriginalLocation(), () -> {
+                            player.setGameMode(data.getOriginalGameMode());
+                        });
+                    } else {
+                        plugin.getLogger().warning(String.format(
+                                "玩家 %s 跨维度返回失败，目标位置: world=%s, x=%.2f, y=%.2f, z=%.2f",
+                                player.getName(),
+                                data.getOriginalLocation().getWorld().getName(),
+                                data.getOriginalLocation().getX(),
+                                data.getOriginalLocation().getY(),
+                                data.getOriginalLocation().getZ()
+                        ));
+                    }
+                });
+            } else {
+                // 同维度返回
+                player.setGameMode(data.getOriginalGameMode());
+                player.teleportAsync(data.getOriginalLocation());
+            }
         });
+    }
+
+    private String formatLocation(Location loc) {
+        return String.format(
+                "世界:%s, x:%.2f, y:%.2f, z:%.2f",
+                loc.getWorld().getName(),
+                loc.getX(),
+                loc.getY(),
+                loc.getZ()
+        );
     }
 
     private void playSound(Player player, String soundKey) {
@@ -323,5 +370,22 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         } else {
             sender.sendMessage(message);
         }
+    }
+
+    private void handlePeekSuccess(Player player, Player target, boolean result) {
+        if (result) {
+            sendMessage(player, "peek-start", "player", target.getName());
+            sendMessage(target, "being-peeked", "player", player.getName());
+            playSound(target, "start-peek");
+            updateActionBar(target);
+        } else {
+            handlePeekFail(player);
+        }
+    }
+
+    private void handlePeekFail(Player player) {
+        peekingPlayers.remove(player);
+        sendMessage(player, "teleport-failed");
+        plugin.getLogger().warning(String.format("玩家 %s 传送失败", player.getName()));
     }
 }
