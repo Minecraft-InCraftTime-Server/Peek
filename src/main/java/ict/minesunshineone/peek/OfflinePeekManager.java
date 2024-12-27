@@ -170,4 +170,12 @@ public class OfflinePeekManager {
                 && pendingPeeks.contains(key + ".gamemode")
                 && pendingPeeks.contains(key + ".startTime");
     }
+
+    public YamlConfiguration getPendingPeeks() {
+        return pendingPeeks;
+    }
+
+    public File getPendingPeeksFile() {
+        return pendingPeeksFile;
+    }
 }

@@ -1,5 +1,6 @@
 package ict.minesunshineone.peek;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -219,6 +220,18 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         data.setExiting(true);  // 设置退出标记
         Player target = data.getTargetPlayer();
 
+        // 只有在主动退出时才删除离线状态数据
+        if (player.isOnline()) {  // 确保是主动退出
+            String uuidString = player.getUniqueId().toString();
+            plugin.getOfflinePeekManager().getPendingPeeks().set(uuidString, null);
+            try {
+                plugin.getOfflinePeekManager().getPendingPeeks().save(plugin.getOfflinePeekManager().getPendingPeeksFile());
+            } catch (IOException e) {
+                plugin.getLogger().warning(String.format("无法删除玩家 %s 的离线观察状态: %s",
+                        player.getName(), e.getMessage()));
+            }
+        }
+
         restorePlayerState(player, data);
         peekingPlayers.remove(player);
 
@@ -317,6 +330,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                             player.setGameMode(data.getOriginalGameMode());
                         });
                     } else {
+                        // 只有在传送真正失败时才记录日志
                         plugin.getLogger().warning(String.format(
                                 "玩家 %s 跨维度返回失败，目标位置: world=%s, x=%.2f, y=%.2f, z=%.2f",
                                 player.getName(),
