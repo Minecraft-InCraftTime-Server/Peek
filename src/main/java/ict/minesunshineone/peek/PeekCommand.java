@@ -156,29 +156,32 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
             if (!player.getWorld().equals(target.getWorld())) {
                 // 跨维度传送，先传送再切换模式
-                player.teleportAsync(target.getLocation()).thenAccept(result -> {
-                    if (result) {
-                        // 确保在正确的维度和区域执行游戏模式切换
-                        plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
+                player.getScheduler().run(plugin, scheduledTask -> {
+                    player.teleportAsync(target.getLocation()).thenAccept(result -> {
+                        if (result) {
                             player.setGameMode(GameMode.SPECTATOR);
                             handlePeekSuccess(player, target, true);
-                        });
-                    } else {
-                        handlePeekFail(player);
-                        peekingPlayers.remove(player);
-                    }
+                        } else {
+                            handlePeekFail(player);
+                            peekingPlayers.remove(player);
+                        }
+                    });
+                }, () -> {
                 });
             } else {
                 // 同维度传送
-                player.setGameMode(GameMode.SPECTATOR);
-                player.teleportAsync(target.getLocation()).thenAccept(result -> {
-                    if (result) {
-                        handlePeekSuccess(player, target, result);
-                    } else {
-                        handlePeekFail(player);
-                        player.setGameMode(peekData.getOriginalGameMode());
-                        peekingPlayers.remove(player);
-                    }
+                player.getScheduler().run(plugin, scheduledTask -> {
+                    player.setGameMode(GameMode.SPECTATOR);
+                    player.teleportAsync(target.getLocation()).thenAccept(result -> {
+                        if (result) {
+                            handlePeekSuccess(player, target, result);
+                        } else {
+                            handlePeekFail(player);
+                            player.setGameMode(peekData.getOriginalGameMode());
+                            peekingPlayers.remove(player);
+                        }
+                    });
+                }, () -> {
                 });
             }
         });
@@ -324,27 +327,31 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         plugin.getServer().getRegionScheduler().execute(plugin, data.getOriginalLocation(), () -> {
             if (!player.getWorld().equals(data.getOriginalLocation().getWorld())) {
                 // 跨维度返回，先传送再切换模式
-                player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
-                    if (result) {
-                        plugin.getServer().getRegionScheduler().execute(plugin, data.getOriginalLocation(), () -> {
+                player.getScheduler().run(plugin, scheduledTask -> {
+                    player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
+                        if (result) {
                             player.setGameMode(data.getOriginalGameMode());
-                        });
-                    } else {
-                        // 只有在传送真正失败时才记录日志
-                        plugin.getLogger().warning(String.format(
-                                "玩家 %s 跨维度返回失败，目标位置: world=%s, x=%.2f, y=%.2f, z=%.2f",
-                                player.getName(),
-                                data.getOriginalLocation().getWorld().getName(),
-                                data.getOriginalLocation().getX(),
-                                data.getOriginalLocation().getY(),
-                                data.getOriginalLocation().getZ()
-                        ));
-                    }
+                        } else {
+                            // 只有在传送真正失败时才记录日志
+                            plugin.getLogger().warning(String.format(
+                                    "玩家 %s 跨维度返回失败，目标位置: world=%s, x=%.2f, y=%.2f, z=%.2f",
+                                    player.getName(),
+                                    data.getOriginalLocation().getWorld().getName(),
+                                    data.getOriginalLocation().getX(),
+                                    data.getOriginalLocation().getY(),
+                                    data.getOriginalLocation().getZ()
+                            ));
+                        }
+                    });
+                }, () -> {
                 });
             } else {
                 // 同维度返回
-                player.setGameMode(data.getOriginalGameMode());
-                player.teleportAsync(data.getOriginalLocation());
+                player.getScheduler().run(plugin, scheduledTask -> {
+                    player.setGameMode(data.getOriginalGameMode());
+                    player.teleportAsync(data.getOriginalLocation());
+                }, () -> {
+                });
             }
         });
     }
