@@ -41,11 +41,17 @@ public class PeekRangeChecker {
                 }
 
                 try {
+                    if (!peeker.getWorld().equals(target.getWorld())) {
+                        continue;
+                    }
+
                     if (peeker.getLocation().distanceSquared(target.getLocation()) > maxDistanceSquared) {
                         handleExceedRange(peeker);
                     }
-                } catch (IllegalStateException e) {
-                    plugin.getLogger().warning(String.format("检查玩家距离时发生错误: %s", e.getMessage()));
+                } catch (Exception e) {
+                    if (plugin.isDebugEnabled()) {
+                        plugin.getLogger().warning(String.format("检查玩家距离时发生错误: %s", e.getMessage()));
+                    }
                 }
             }
         }, CHECK_INTERVAL, CHECK_INTERVAL);
