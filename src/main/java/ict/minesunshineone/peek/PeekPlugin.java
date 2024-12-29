@@ -20,6 +20,7 @@ public class PeekPlugin extends JavaPlugin {
     private boolean debug;
     private PeekCommand peekCommand;
     private OfflinePeekManager offlinePeekManager;
+    private PeekRangeChecker rangeChecker;
 
     @Override
     public void onEnable() {
@@ -53,11 +54,19 @@ public class PeekPlugin extends JavaPlugin {
             new PeekPlaceholderExpansion(this).register();
         }
 
+        // 初始化范围检查器
+        rangeChecker = new PeekRangeChecker(this, peekCommand);
+
         getLogger().info("Peek插件已启用！");
     }
 
     @Override
     public void onDisable() {
+        // 关闭范围检查器
+        if (rangeChecker != null) {
+            rangeChecker.shutdown();
+        }
+
         // 结束所有玩家的观察状态
         if (peekCommand != null) {
             new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {

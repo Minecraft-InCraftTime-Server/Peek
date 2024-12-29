@@ -42,8 +42,8 @@ public class CooldownManager {
         return true;
     }
 
-    private int getRemainingCooldown(Player player, Map<UUID, Long> cooldowns) {
-        if (player.hasPermission("peek.nocooldown")) {
+    public int getRemainingCooldown(Player player, Map<UUID, Long> cooldowns) {
+        if (player == null || player.hasPermission("peek.nocooldown")) {
             return 0;
         }
 
@@ -54,12 +54,28 @@ public class CooldownManager {
         }
 
         long now = System.currentTimeMillis();
-        long diff = (lastUsage + peekCooldown * 1000L - now) / 1000L;
-        return diff > 0 ? (int) diff : 0;
+        long remaining = (lastUsage + peekCooldown * 1000L - now) / 1000L;
+        return Math.max(0, (int) remaining);
     }
 
     public void setCooldown(Player player) {
         int configuredCooldown = plugin.getConfig().getInt("cooldowns.peek", 30);
         peekCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + (configuredCooldown * 1000L));
+    }
+
+    public void setCooldownAfterPeek(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        if (!player.hasPermission("peek.nocooldown")) {
+            UUID uuid = player.getUniqueId();
+            peekCooldowns.put(uuid, System.currentTimeMillis());
+
+            // 定时清理过期的冷却时间
+            plugin.getServer().getAsyncScheduler().runDelayed(plugin, task -> {
+                peekCooldowns.remove(uuid);
+            }, peekCooldown * 1000L, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
     }
 }

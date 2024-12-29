@@ -88,16 +88,6 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
      * @return 是否执行成功
      */
     private boolean handlePeek(Player player, String targetName) {
-        // 检查冷却时间
-        if (!plugin.getCooldownManager().checkPeekCooldown(player)) {
-            int remaining = plugin.getCooldownManager().getRemainingPeekCooldown(player);
-            sendMessage(player, "cooldown-peek", "time", String.valueOf(remaining));
-            player.playSound(player.getLocation(),
-                    Sound.valueOf(plugin.getConfig().getString("sounds.cooldown", "ENTITY_VILLAGER_NO")),
-                    1.0f, 1.0f);
-            return true;
-        }
-
         // 检查玩家是否已经在偷窥中
         if (peekingPlayers.containsKey(player)) {
             sendMessage(player, "already-peeking");
@@ -214,13 +204,22 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
      * @return 是否执行成功
      */
     public boolean handleExit(Player player) {
-        if (!peekingPlayers.containsKey(player)) {
+        if (player == null || !player.isOnline()) {
+            return false;
+        }
+
+        PeekData data = peekingPlayers.get(player);
+        if (data == null) {
             sendMessage(player, "not-peeking");
             return true;
         }
 
-        PeekData data = peekingPlayers.get(player);
-        data.setExiting(true);  // 设置退出标记
+        // 防止重复退出
+        if (data.isExiting()) {
+            return true;
+        }
+
+        data.setExiting(true);
         Player target = data.getTargetPlayer();
 
         // 只有在主动退出时才删除离线状态数据
@@ -250,6 +249,9 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
             plugin.getStatistics().recordPeekDuration(player, duration);
         }
+
+        // 在退出时设置冷却
+        plugin.getCooldownManager().setCooldownAfterPeek(player);
 
         return true;
     }
@@ -324,7 +326,14 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     private void restorePlayerState(Player player, PeekData data) {
+        if (player == null || data == null || !player.isOnline()) {
+            return;
+        }
+
         plugin.getServer().getRegionScheduler().execute(plugin, data.getOriginalLocation(), () -> {
+            if (!player.isOnline()) {
+                return;  // 再次检查，以防异步执行期间玩家下线
+            }
             if (!player.getWorld().equals(data.getOriginalLocation().getWorld())) {
                 // 跨维度返回，先传送再切换模式
                 player.getScheduler().run(plugin, scheduledTask -> {
@@ -364,7 +373,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private void sendMessage(CommandSender sender, String key, String... replacements) {
+    void sendMessage(CommandSender sender, String key, String... replacements) {
         if (sender == null || key == null) {
             return;
         }

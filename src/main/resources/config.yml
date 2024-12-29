@@ -8,7 +8,7 @@ max-peek-duration: 5
 
 # 冷却时间设置（秒）
 cooldowns:
-  peek: 30      # 观察指令冷却时间
+  peek: 120     # 观察指令冷却时间
 
 # 统计设置
 statistics:
@@ -51,6 +51,7 @@ messages:
     peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
     peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
     different-dimension: "&b&l[ICT] &f>> &d魔法似乎无法跨越维度的界限呢~"
+    range-exceeded: "&b&l[ICT] &f>> &d你离目标太远了，观察魔法已经自动解除~"
 
 # 权限检查设置
 permissions:
@@ -68,3 +69,4 @@ performance:
 # 功能限制
 limits:
   max-observers: 5    # 单个玩家最大观察者数量
+  max-peek-distance: 50.0  # 最大观察距离（格数）
