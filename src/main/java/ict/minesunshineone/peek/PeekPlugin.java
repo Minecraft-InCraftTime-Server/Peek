@@ -16,11 +16,11 @@ public class PeekPlugin extends JavaPlugin {
     private int maxPeekDuration;     // 最大观察时间（秒）
     private Statistics statistics;
     private CooldownManager cooldownManager;
-    private boolean checkTargetPermission;
     private boolean debug;
     private PeekCommand peekCommand;
     private OfflinePeekManager offlinePeekManager;
     private PeekRangeChecker rangeChecker;
+    private PrivacyManager privacyManager;
 
     @Override
     public void onEnable() {
@@ -56,6 +56,8 @@ public class PeekPlugin extends JavaPlugin {
 
         // 初始化范围检查器
         rangeChecker = new PeekRangeChecker(this, peekCommand);
+
+        this.privacyManager = new PrivacyManager(this);
 
         getLogger().info("Peek插件已启用！");
     }
@@ -106,6 +108,10 @@ public class PeekPlugin extends JavaPlugin {
             statistics.saveStats();
         }
 
+        if (privacyManager != null) {
+            privacyManager.savePrivacySettings();
+        }
+
         getLogger().info("Peek插件已禁用！");
     }
 
@@ -114,8 +120,17 @@ public class PeekPlugin extends JavaPlugin {
      */
     private void loadConfig() {
         reloadConfig();
+        // 确保配置节点存在
+        if (!getConfig().isSet("privacy")) {
+            getConfig().set("privacy.request-timeout", 30);
+            getConfig().set("privacy.cooldown.enabled", true);
+            getConfig().set("privacy.cooldown.duration", 120);
+            getConfig().set("privacy.sounds.request", "BLOCK_NOTE_BLOCK_PLING");
+            getConfig().set("privacy.sounds.accept", "ENTITY_PLAYER_LEVELUP");
+            getConfig().set("privacy.sounds.deny", "ENTITY_VILLAGER_NO");
+            saveConfig();
+        }
         this.maxPeekDuration = getConfig().getInt("max-peek-duration", 5) * 60;
-        this.checkTargetPermission = getConfig().getBoolean("permissions.check-target", true);
         this.debug = getConfig().getBoolean("debug", false);
     }
 
@@ -135,15 +150,19 @@ public class PeekPlugin extends JavaPlugin {
         return cooldownManager;
     }
 
-    public boolean isCheckTargetPermission() {
-        return checkTargetPermission;
-    }
-
     public boolean isDebugEnabled() {
         return debug;
     }
 
     public OfflinePeekManager getOfflinePeekManager() {
         return offlinePeekManager;
+    }
+
+    public PrivacyManager getPrivacyManager() {
+        return privacyManager;
+    }
+
+    public PeekCommand getPeekCommand() {
+        return peekCommand;
     }
 }

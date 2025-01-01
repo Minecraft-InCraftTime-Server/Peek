@@ -67,6 +67,33 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             }
 
             // 处理观察命令
+            if (args[0].equalsIgnoreCase("privacy")) {
+                if (!(sender instanceof Player)) {
+                    sendMessage(sender, "command-player-only");
+                    return true;
+                }
+                plugin.getPrivacyManager().togglePrivateMode((Player) sender);
+                return true;
+            }
+
+            if (args[0].equalsIgnoreCase("accept")) {
+                if (!(sender instanceof Player)) {
+                    sendMessage(sender, "command-player-only");
+                    return true;
+                }
+                plugin.getPrivacyManager().handleAccept((Player) sender);
+                return true;
+            }
+
+            if (args[0].equalsIgnoreCase("deny")) {
+                if (!(sender instanceof Player)) {
+                    sendMessage(sender, "command-player-only");
+                    return true;
+                }
+                plugin.getPrivacyManager().handleDeny((Player) sender);
+                return true;
+            }
+
             return handlePeek(player, args[0]);
         } catch (Exception e) {
             plugin.getLogger().severe(String.format("执行peek命令时发生错误: %s", e.getMessage()));
@@ -87,7 +114,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
      * @param targetName 目标玩家名
      * @return 是否执行成功
      */
-    private boolean handlePeek(Player player, String targetName) {
+    public boolean handlePeek(Player player, String targetName) {
         // 检查玩家是否已经在偷窥中
         if (peekingPlayers.containsKey(player)) {
             sendMessage(player, "already-peeking");
@@ -107,9 +134,9 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // 检查目标玩家权限
-        if (plugin.isCheckTargetPermission() && !target.hasPermission("peek.target")) {
-            sendMessage(player, "target-no-permission");
+        // 检查私人模式
+        if (plugin.getPrivacyManager().isPrivateMode(target)) {
+            plugin.getPrivacyManager().sendPeekRequest(player, target);
             return true;
         }
 
@@ -312,7 +339,9 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             completions.add("exit");
             completions.add("stats");
-            // 添加在线玩家名称
+            completions.add("privacy");
+            completions.add("accept");
+            completions.add("deny");
             completions.addAll(plugin.getServer().getOnlinePlayers().stream()
                     .map(Player::getName)
                     .collect(Collectors.toList()));

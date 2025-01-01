@@ -29,7 +29,7 @@ messages:
   zh_CN:
     command-player-only: "&b&l[ICT] &f>> &d这个魔法只能由玩家施展哦~"
     no-permission: "&b&l[ICT] &f>> &d抱歉，你还没有获得使用这个魔法的权限呢~"
-    usage: "&b&l[ICT] &f>> &d施法指南：&f/peek <玩家名> &7或 &f/peek exit &7✨"
+    usage: "&b&l[ICT] &f>> &d施法指南：\n&d➤ &f/peek <玩家名> &7观察指定玩家\n&d➤ &f/peek exit &7退出观察模式\n&d➤ &f/peek stats &7查看观察统计\n&d➤ &f/peek privacy &7切换私人模式\n&d➤ &f/peek accept &7接受观察请求\n&d➤ &f/peek deny &7拒绝观察请求"
     already-peeking: "&b&l[ICT] &f>> &d你已经在观察别人了呢，输入 &f/peek exit &d解除魔法吧~"
     player-not-found: "&b&l[ICT] &f>> &d咦？找不到玩家 &f{player} &d呢，是不是拼错名字啦？"
     cannot-peek-self: "&b&l[ICT] &f>> &d自己观察自己？这可不行呢，试试观察别人吧！"
@@ -52,11 +52,15 @@ messages:
     peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
     different-dimension: "&b&l[ICT] &f>> &d魔法似乎无法跨越维度的界限呢~"
     range-exceeded: "&b&l[ICT] &f>> &d你离目标太远了，观察魔法已经自动解除~"
-
-# 权限检查设置
-permissions:
-  check-target: true       # 是否检查目标玩家的权限
-  target-permission: peek.target  # 目标玩家需要的权限
+    privacy-mode-enabled: "&b&l[ICT] &f>> &d私人模式已 &a&l启用"
+    privacy-mode-disabled: "&b&l[ICT] &f>> &d私人模式已 &c&l禁用"
+    peek-request: "&b&l[ICT] &f>> &d玩家 &f{player} &d请求观察你"
+    request-already-pending: "&b&l[ICT] &f>> &c该玩家已有一个待处理的请求"
+    request-timeout: "&b&l[ICT] &f>> &c请求已超时"
+    request-timeout-target: "&b&l[ICT] &f>> &c观察请求已超时"
+    request-denied: "&b&l[ICT] &f>> &c对方拒绝了你的观察请求"
+    no-pending-request: "&b&l[ICT] &f>> &c没有待处理的观察请求"
+    request-expired: "&b&l[ICT] &f>> &c该请求已过期"
 
 # 调试模式设置
 debug: false
@@ -70,3 +74,13 @@ performance:
 limits:
   max-observers: 5    # 单个玩家最大观察者数量
   max-peek-distance: 50.0  # 最大观察距离（格数）
+
+privacy:
+  request-timeout: 30  # 请求超时时间(秒)
+  cooldown:
+    enabled: true
+    duration: 120  # 拒绝或超时后的冷却时间(秒)
+  sounds:
+    request: BLOCK_NOTE_BLOCK_PLING  # 收到请求时的声音
+    accept: ENTITY_PLAYER_LEVELUP    # 请求被接受时的声音
+    deny: ENTITY_VILLAGER_NO         # 请求被拒绝时的声音

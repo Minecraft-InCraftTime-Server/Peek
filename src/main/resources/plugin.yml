@@ -15,6 +15,9 @@ commands:
       <gray>/peek <玩家名></gray> - 观察指定玩家
       <gray>/peek exit</gray> - 退出观察模式
       <gray>/peek stats</gray> - 查看个人观察统计
+      <gray>/peek privacy</gray> - 切换私人模式
+      <gray>/peek accept</gray> - 接受观察请求
+      <gray>/peek deny</gray> - 拒绝观察请求
     permission: peek.use
     permission-message: §c你没有权限使用此命令！
 
@@ -28,5 +31,8 @@ permissions:
   peek.stats:
     description: 允许查看观察统计信息
     default: true 
+  peek.privacy:
+    description: 允许使用私人模式
+    default: true
 
 softdepend: [PlaceholderAPI] 
