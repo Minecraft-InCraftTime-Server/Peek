@@ -10,6 +10,8 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+
 /**
  * 处理与观察模式相关的事件监听器
  */
@@ -57,7 +59,8 @@ public class PeekListener implements Listener {
                 plugin.getServer().getRegionScheduler().execute(plugin,
                         peeker.getLocation(), () -> {
                     peekCommand.handleExit(peeker);
-                    peeker.sendMessage(plugin.getMessages().get("target-offline"));
+                    peeker.sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                            .deserialize(plugin.getMessages().get("target-offline")));
                 });
                 return true;
             }

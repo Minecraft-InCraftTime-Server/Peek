@@ -162,7 +162,8 @@ public class PrivacyManager {
     public void handleDeny(Player target) {
         PendingRequest request = pendingRequests.remove(target.getUniqueId());
         if (request != null && request.requester().isOnline()) {
-            request.requester().sendMessage(plugin.getMessages().get("request-denied"));
+            request.requester().sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                    .deserialize(plugin.getMessages().get("request-denied")));
             plugin.getCooldownManager().setCooldownAfterPeek(request.requester());
             playSound(target, "deny");
             playSound(request.requester(), "deny");
