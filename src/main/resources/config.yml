@@ -46,7 +46,6 @@ messages:
     command-error: "&b&l[ICT] &f>> &c糟糕！魔法出现了意外，快去找管理员帮忙吧！"
     teleport-failed: "&b&l[ICT] &f>> &c哎呀！返回原位置时出了点小问题，重新试试看吧~"
     stats-disabled: "&b&l[ICT] &f>> &c魔法记录功能现在处于休眠状态哦~"
-    gamemode-force-exit: "&b&l[ICT] &f>> &c由于游戏模式改变，魔法效果被迫解除啦！"
     too-many-observers: "&b&l[ICT] &f>> &d这位玩家已经被太多魔法师关注啦，等会儿再来吧~"
     peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
     peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
@@ -61,6 +60,7 @@ messages:
     request-denied: "&b&l[ICT] &f>> &c对方拒绝了你的观察请求"
     no-pending-request: "&b&l[ICT] &f>> &c没有待处理的观察请求"
     request-expired: "&b&l[ICT] &f>> &c该请求已过期"
+    request-sent: "&b&l[ICT] &f>> &d已成功向玩家 &f{player} &d发送观察请求"
 
 # 调试模式设置
 debug: false
@@ -72,7 +72,6 @@ performance:
 
 # 功能限制
 limits:
-  max-observers: 5    # 单个玩家最大观察者数量
   max-peek-distance: 50.0  # 最大观察距离（格数）
 
 privacy:

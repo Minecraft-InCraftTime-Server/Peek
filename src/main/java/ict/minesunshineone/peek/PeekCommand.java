@@ -140,17 +140,6 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // 检查观察者数量限制
-        int maxObservers = plugin.getConfig().getInt("limits.max-observers", 5);
-        long currentObservers = peekingPlayers.values().stream()
-                .filter(data -> data.getTargetPlayer().equals(target))
-                .count();
-
-        if (currentObservers >= maxObservers) {
-            sendMessage(player, "too-many-observers");
-            return true;
-        }
-
         // 记录观察开始
         if (plugin.getStatistics() != null) {
             plugin.getStatistics().recordPeekStart(player, target);

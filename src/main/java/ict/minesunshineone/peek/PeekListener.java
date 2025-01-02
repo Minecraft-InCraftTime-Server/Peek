@@ -1,12 +1,10 @@
 package ict.minesunshineone.peek;
 
-import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
@@ -80,25 +78,6 @@ public class PeekListener implements Listener {
             });
             // 保存离线数据
             plugin.getOfflinePeekManager().saveOfflinePlayerState(player, data);
-        }
-    }
-
-    /**
-     * 处理玩家游戏模式改变事件 如果是被观察的玩家，需要处理相关逻辑
-     */
-    @EventHandler
-    public void onGameModeChange(PlayerGameModeChangeEvent event) {
-        Player player = event.getPlayer();
-        Location location = player.getLocation();
-
-        if (peekCommand.getPeekingPlayers().containsKey(player)) {
-            PeekData data = peekCommand.getPeekingPlayers().get(player);
-            if (!event.getNewGameMode().equals(GameMode.SPECTATOR) && !data.isExiting()) {
-                plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
-                    peekCommand.handleExit(player);
-                    player.sendMessage(plugin.getMessages().get("gamemode-force-exit"));
-                });
-            }
         }
     }
 

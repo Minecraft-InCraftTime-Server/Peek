@@ -99,7 +99,7 @@ public class PrivacyManager {
         PendingRequest request = new PendingRequest(requester, target);
         pendingRequests.put(targetUUID, request);
 
-        // 发送带按钮的请求消息
+        // 发送带按钮的请求消息给目标玩家
         Component message = LegacyComponentSerializer.legacyAmpersand().deserialize(
                 plugin.getMessages().get("peek-request", "player", requester.getName()))
                 .append(Component.text(" "))
@@ -114,15 +114,22 @@ public class PrivacyManager {
                         .hoverEvent(HoverEvent.showText(Component.text("点击拒绝"))));
 
         target.sendMessage(message);
+        // 给请求者发送消息
+        requester.sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                .deserialize(plugin.getMessages().get("request-sent", "player", target.getName())));
+
         playSound(target, "request");
+        playSound(requester, "request");
 
         // 设置超时
         int timeoutSeconds = plugin.getConfig().getInt("privacy.request-timeout", 30);
         plugin.getServer().getAsyncScheduler().runDelayed(plugin, (task) -> {
             if (pendingRequests.remove(targetUUID, request)) {
                 plugin.getServer().getRegionScheduler().execute(plugin, target.getLocation(), () -> {
-                    requester.sendMessage(plugin.getMessages().get("request-timeout"));
-                    target.sendMessage(plugin.getMessages().get("request-timeout-target"));
+                    requester.sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                            .deserialize(plugin.getMessages().get("request-timeout")));
+                    target.sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                            .deserialize(plugin.getMessages().get("request-timeout-target")));
                     if (plugin.getConfig().getBoolean("privacy.cooldown.enabled", true)) {
                         plugin.getCooldownManager().setCooldownAfterPeek(requester);
                     }
