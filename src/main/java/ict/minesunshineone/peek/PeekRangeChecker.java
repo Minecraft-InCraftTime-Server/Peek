@@ -14,7 +14,7 @@ public class PeekRangeChecker {
     private final double maxDistance;
     private final double maxDistanceSquared;
     private ScheduledTask checkTask;
-    private static final long CHECK_INTERVAL = 60L;
+    private static final long CHECK_INTERVAL = 100L;
 
     public PeekRangeChecker(PeekPlugin plugin, PeekCommand peekCommand) {
         this.plugin = plugin;

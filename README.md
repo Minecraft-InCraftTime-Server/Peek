@@ -12,6 +12,7 @@
 - 🔒 完善的权限管理系统
 - 🌈 生动有趣的提示信息
 - 💫 断线重连自动恢复状态
+- 📈 私人模式与请求系统
 - 📈 PlaceholderAPI 变量支持
 
 ## 📦 安装
@@ -26,13 +27,17 @@
 - `/peek <玩家名>` 开始观察指定玩家
 - `/peek exit` 停止观察
 - `/peek stats` 查看观察统计
+- `/peek privacy` 切换私人模式
+- `/peek accept` 接受观察请求
+- `/peek deny` 拒绝观察请求
 - `/peek help` 查看帮助信息
 
 ## ⚙️ 配置
 
 主要配置项：
 - `max-peek-duration` 最大观察时长（秒）
-- `check-target` 是否检查目标权限
+- `privacy.request-timeout` 请求超时时间（秒）
+- `privacy.cooldown.duration` 请求冷却时间（秒）
 - `debug` 是否开启调试模式
 - `performance.async-save` 是否异步保存数据
 
@@ -41,15 +46,18 @@
 - `start-peek` 开始被观察时的声音
 - `end-peek` 结束被观察时的声音
 - `cooldown` 冷却中的声音
+- `privacy.sounds.request` 收到请求时的声音
+- `privacy.sounds.accept` 请求被接受时的声音
+- `privacy.sounds.deny` 请求被拒绝时的声音
 
 ## 🔑 权限节点
 
 - `peek.use` 使用观察插件
 - `peek.admin` 管理观察插件
-- `peek.check-target` 检查目标权限
+- `peek.privacy` 使用私人模式
 - `peek.debug` 开启调试模式
 - `peek.nocooldown` 绕过冷却时间
-- `peek.target` 允许被其他玩家观察
+- `peek.stats` 查看统计信息
 
 ## 📊 统计变量
 
@@ -66,19 +74,17 @@ PlaceholderAPI 变量：
 4. 建议在正式使用前先测试配置是否正确
 5. 如遇问题，请查看服务器日志获取详细信息
 6. 使用 `/peek exit` 而不是切换游戏模式来退出观察
-7. 观察者数量限制默认为 5 人，可在配置中调整
-8. 统计数据每 10 分钟自动保存一次
-9. 权限节点的设置会影响插件的使用范围
-10. 支持断线重连自动恢复观察状态
-11. 统计变量需要安装 PlaceholderAPI 才能使用
+7. 统计数据每 10 分钟自动保存一次
+8. 权限节点的设置会影响插件的使用范围
+9.  支持断线重连自动恢复观察状态
+10. 统计变量需要安装 PlaceholderAPI 才能使用
 
 ## 🛡️ 安全特性
 
 - 服务器关闭时自动结束所有观察状态
 - 目标玩家下线时自动结束观察
-- 游戏模式改变时自动退出观察
-- 支持最大观察者数量限制
-- 可配置目标玩家权限检查
+- 支持私人模式和请求系统
+- 可配置请求超时和冷却时间
 - 断线重连自动恢复原始状态
 
 ## 📊 统计系统

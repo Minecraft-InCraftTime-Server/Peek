@@ -61,6 +61,7 @@ messages:
     no-pending-request: "&b&l[ICT] &f>> &c没有待处理的观察请求"
     request-expired: "&b&l[ICT] &f>> &c该请求已过期"
     request-sent: "&b&l[ICT] &f>> &d已成功向玩家 &f{player} &d发送观察请求"
+    target-is-peeking: "&b&l[ICT] &f>> &c该玩家正在观察其他玩家，无法被观察"
 
 # 调试模式设置
 debug: false

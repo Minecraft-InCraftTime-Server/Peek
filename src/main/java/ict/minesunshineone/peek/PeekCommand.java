@@ -134,6 +134,12 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // 检查目标玩家是否正在peek状态
+        if (peekingPlayers.containsKey(target)) {
+            sendMessage(player, "target-is-peeking");
+            return true;
+        }
+
         // 检查私人模式
         if (plugin.getPrivacyManager().isPrivateMode(target)) {
             plugin.getPrivacyManager().sendPeekRequest(player, target);
