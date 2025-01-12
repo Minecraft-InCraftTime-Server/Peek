@@ -1,27 +1,25 @@
 package ict.minesunshineone.peek.listener;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.Location;
 
 import ict.minesunshineone.peek.PeekPlugin;
-import ict.minesunshineone.peek.command.PeekCommand;
-import java.util.Map;
-import java.util.HashMap;
 import ict.minesunshineone.peek.data.PeekData;
 
 public class PeekListener implements Listener {
 
     private final PeekPlugin plugin;
-    private final PeekCommand peekCommand;
 
-    public PeekListener(PeekPlugin plugin, PeekCommand peekCommand) {
+    public PeekListener(PeekPlugin plugin) {
         this.plugin = plugin;
-        this.peekCommand = peekCommand;
     }
 
     @EventHandler
@@ -74,12 +72,17 @@ public class PeekListener implements Listener {
                                                 ? player.getBedSpawnLocation()
                                                 : player.getWorld().getSpawnLocation();
 
-                                        player.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
-                                            if (spawnSuccess) {
-                                                player.setGameMode(savedState.getOriginalGameMode());
-                                            }
+                                        if (spawnLoc != null) {
+                                            player.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
+                                                if (spawnSuccess) {
+                                                    player.setGameMode(savedState.getOriginalGameMode());
+                                                }
+                                                plugin.getStateManager().clearPlayerState(player);
+                                            });
+                                        } else {
+                                            plugin.getLogger().warning(String.format("无法找到玩家 %s 的有效重生点", player.getName()));
                                             plugin.getStateManager().clearPlayerState(player);
-                                        });
+                                        }
                                     }
                                 });
                     });

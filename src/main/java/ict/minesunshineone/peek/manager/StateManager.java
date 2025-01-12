@@ -38,7 +38,7 @@ public class StateManager {
         try {
             config.save(stateFile);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save state for player: " + player.getName());
+            plugin.getLogger().warning(String.format("无法保存玩家 %s 的状态", player.getName()));
         }
     }
 
@@ -58,7 +58,7 @@ public class StateManager {
 
             return new PeekData(location, gameMode, target, startTime);
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to load state for player: " + player.getName());
+            plugin.getLogger().warning(String.format("无法加载玩家 %s 的状态", player.getName()));
             return null;
         }
     }

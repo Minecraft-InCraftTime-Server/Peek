@@ -26,7 +26,7 @@ public class PeekPlaceholderExpansion extends PlaceholderExpansion {
 
     @Override
     public String getVersion() {
-        return plugin.getDescription().getVersion();
+        return "${project.version}";
     }
 
     @Override
@@ -53,7 +53,7 @@ public class PeekPlaceholderExpansion extends PlaceholderExpansion {
                     null;
             };
         } catch (Exception e) {
-            plugin.getLogger().warning("Error processing placeholder: " + e.getMessage());
+            plugin.getLogger().warning(String.format("处理变量时发生错误：%s", e.getMessage()));
             return "";
         }
     }

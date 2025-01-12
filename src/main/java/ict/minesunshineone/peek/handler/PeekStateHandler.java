@@ -28,7 +28,7 @@ public class PeekStateHandler {
 
     public void startPeek(Player peeker, Player target) {
         if (peeker == null || target == null) {
-            plugin.getLogger().warning("Attempted to start peek with null player");
+            plugin.getLogger().warning("尝试对空玩家使用贴贴功能");
             return;
         }
 
@@ -64,7 +64,7 @@ public class PeekStateHandler {
 
     public void endPeek(Player peeker, boolean shouldRestore) {
         if (peeker == null) {
-            plugin.getLogger().warning("Attempted to end peek with null player");
+            plugin.getLogger().warning("尝试对空玩家结束贴贴功能");
             return;
         }
 
@@ -134,7 +134,7 @@ public class PeekStateHandler {
                     }
                 });
             } catch (Exception e) {
-                plugin.getLogger().warning("Failed to change gamemode for " + peeker.getName());
+                plugin.getLogger().warning(String.format("为玩家 %s 切换游戏模式时发生错误", peeker.getName()));
                 endPeek(peeker);
             }
         });
@@ -147,7 +147,7 @@ public class PeekStateHandler {
                     peeker.setGameMode(data.getOriginalGameMode());
                 } else {
                     plugin.getLogger().warning(String.format(
-                            "Failed to teleport %s back to original location, using spawn location",
+                            "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
                             peeker.getName()
                     ));
 
@@ -155,18 +155,20 @@ public class PeekStateHandler {
                             ? peeker.getBedSpawnLocation()
                             : peeker.getWorld().getSpawnLocation();
 
-                    plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
-                        peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
-                            if (spawnSuccess) {
-                                peeker.setGameMode(data.getOriginalGameMode());
-                            } else {
-                                plugin.getLogger().severe(String.format(
-                                        "Failed to teleport %s to any safe location",
-                                        peeker.getName()
-                                ));
-                            }
+                    if (spawnLoc != null) {
+                        plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
+                            peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
+                                if (spawnSuccess) {
+                                    peeker.setGameMode(data.getOriginalGameMode());
+                                } else {
+                                    plugin.getLogger().severe(String.format(
+                                            "无法将玩家 %s 传送到任何安全位置",
+                                            peeker.getName()
+                                    ));
+                                }
+                            });
                         });
-                    });
+                    }
                     plugin.getMessages().send(peeker, "teleport-failed");
                 }
             });
@@ -190,7 +192,7 @@ public class PeekStateHandler {
                 Sound sound = Sound.valueOf(soundName);
                 player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
             } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning("Invalid sound name: " + soundName);
+                plugin.getLogger().warning(String.format("无效的音效名称：%s", soundName));
             }
         }
     }
@@ -209,7 +211,6 @@ public class PeekStateHandler {
                         }
 
                         try {
-                            // 如果在同一个世界才检查距离
                             if (peeker.getWorld().equals(target.getWorld())) {
                                 double distance = peeker.getLocation().distance(target.getLocation());
                                 if (distance > maxPeekDistance) {
@@ -221,7 +222,7 @@ public class PeekStateHandler {
                                 teleportAndSetGameMode(peeker, target);
                             }
                         } catch (Exception e) {
-                            plugin.getLogger().warning("Error in range checker: " + e.getMessage());
+                            plugin.getLogger().warning(String.format("距离检查时发生错误：%s", e.getMessage()));
                             endPeek(peeker);
                         }
                     },

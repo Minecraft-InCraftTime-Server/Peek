@@ -48,11 +48,16 @@ public class PeekPlugin extends JavaPlugin {
 
         // 注册命令
         PeekCommand peekCommand = new PeekCommand(this);
-        getCommand("peek").setExecutor(peekCommand);
-        getCommand("peek").setTabCompleter(peekCommand);
+        var cmd = getCommand("peek");
+        if (cmd != null) {
+            cmd.setExecutor(peekCommand);
+            cmd.setTabCompleter(peekCommand);
+        } else {
+            getLogger().severe("无法注册 peek 命令，请检查 plugin.yml 配置");
+        }
 
         // 注册监听器
-        getServer().getPluginManager().registerEvents(new PeekListener(this, peekCommand), this);
+        getServer().getPluginManager().registerEvents(new PeekListener(this), this);
 
         // 如果有PlaceholderAPI，注册变量
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -115,14 +120,17 @@ public class PeekPlugin extends JavaPlugin {
         }
 
         // 验证声音名称
-        for (String key : config.getConfigurationSection("sounds").getKeys(false)) {
-            String soundName = config.getString("sounds." + key);
-            try {
-                Sound.valueOf(soundName);
-            } catch (IllegalArgumentException e) {
-                getLogger().warning("Invalid sound name in config: " + soundName);
-                config.set("sounds." + key, defaults.get("sounds." + key));
-                needsSave = true;
+        var soundsSection = config.getConfigurationSection("sounds");
+        if (soundsSection != null) {
+            for (String key : soundsSection.getKeys(false)) {
+                String soundName = config.getString("sounds." + key);
+                try {
+                    Sound.valueOf(soundName);
+                } catch (IllegalArgumentException e) {
+                    getLogger().warning(String.format("配置中存在无效的音效名称：%s", soundName));
+                    config.set("sounds." + key, defaults.get("sounds." + key));
+                    needsSave = true;
+                }
             }
         }
 

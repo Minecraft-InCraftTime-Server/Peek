@@ -10,12 +10,10 @@ import ict.minesunshineone.peek.PeekPlugin;
 
 public class CooldownManager {
 
-    private final PeekPlugin plugin;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final int cooldownDuration;
 
     public CooldownManager(PeekPlugin plugin) {
-        this.plugin = plugin;
         this.cooldownDuration = plugin.getConfig().getInt("cooldowns.peek", 120);
     }
 

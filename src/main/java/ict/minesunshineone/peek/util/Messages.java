@@ -2,12 +2,12 @@ package ict.minesunshineone.peek.util;
 
 import java.io.File;
 
-import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 public class Messages {
 
@@ -31,7 +31,7 @@ public class Messages {
 
         messages = YamlConfiguration.loadConfiguration(langFile);
         if (!messages.contains("messages")) {
-            plugin.getLogger().severe("Could not find messages section for language: " + language);
+            plugin.getLogger().severe(String.format("无法找到语言 %s 的消息配置", language));
             // 加载默认消息作为备份
             messages = new YamlConfiguration();
             messages.createSection("messages");
@@ -41,7 +41,7 @@ public class Messages {
     public void send(Player player, String key, String... placeholders) {
         String message = messages.getString("messages." + key);
         if (message == null) {
-            plugin.getLogger().warning("Missing message key: " + key);
+            plugin.getLogger().warning(String.format("找不到消息键：%s", key));
             return;
         }
 
@@ -52,14 +52,14 @@ public class Messages {
             }
         }
 
-        player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+        player.sendMessage(MiniMessage.miniMessage().deserialize(
                 messages.getString("messages.prefix", "") + message));
     }
 
     public void send(CommandSender sender, String key, String... placeholders) {
         String message = messages.getString("messages." + key);
         if (message == null) {
-            plugin.getLogger().warning("Missing message key: " + key);
+            plugin.getLogger().warning(String.format("找不到消息键：%s", key));
             return;
         }
 
@@ -69,7 +69,7 @@ public class Messages {
             }
         }
 
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+        sender.sendMessage(MiniMessage.miniMessage().deserialize(
                 messages.getString("messages.prefix", "") + message));
     }
 
