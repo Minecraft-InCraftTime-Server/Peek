@@ -7,7 +7,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
-import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public class Messages {
 
@@ -52,8 +52,11 @@ public class Messages {
             }
         }
 
-        player.sendMessage(MiniMessage.miniMessage().deserialize(
-                messages.getString("messages.prefix", "") + message));
+        // 添加前缀并处理颜色代码
+        String prefix = messages.getString("messages.prefix", "");
+        String fullMessage = prefix + message;
+
+        player.sendMessage(LegacyComponentSerializer.legacyAmpersand().deserialize(fullMessage));
     }
 
     public void send(CommandSender sender, String key, String... placeholders) {
@@ -69,8 +72,11 @@ public class Messages {
             }
         }
 
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(
-                messages.getString("messages.prefix", "") + message));
+        // 添加前缀并处理颜色代码
+        String prefix = messages.getString("messages.prefix", "");
+        String fullMessage = prefix + message;
+
+        sender.sendMessage(LegacyComponentSerializer.legacyAmpersand().deserialize(fullMessage));
     }
 
     public String get(String key) {
