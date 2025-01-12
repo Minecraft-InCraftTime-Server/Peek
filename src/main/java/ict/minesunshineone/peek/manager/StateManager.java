@@ -2,6 +2,7 @@ package ict.minesunshineone.peek.manager;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -14,64 +15,58 @@ import ict.minesunshineone.peek.data.PeekData;
 public class StateManager {
 
     private final PeekPlugin plugin;
-    private final YamlConfiguration stateData;
-    private final File stateFile;
+    private final File statesDir;
 
     public StateManager(PeekPlugin plugin) {
         this.plugin = plugin;
-        this.stateFile = new File(plugin.getDataFolder(), "player_states.yml");
-        this.stateData = YamlConfiguration.loadConfiguration(stateFile);
+        this.statesDir = new File(plugin.getDataFolder(), "states");
+        if (!statesDir.exists()) {
+            statesDir.mkdirs();
+        }
     }
 
     public void savePlayerState(Player player, PeekData data) {
-        String path = player.getUniqueId().toString();
-        stateData.set(path + ".location", data.getOriginalLocation());
-        stateData.set(path + ".gamemode", data.getOriginalGameMode().name());
-        stateData.set(path + ".target", data.getTargetPlayer().getUniqueId().toString());
-        stateData.set(path + ".startTime", data.getStartTime());
+        File stateFile = new File(statesDir, player.getUniqueId() + ".yml");
+        YamlConfiguration config = new YamlConfiguration();
 
-        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
-            try {
-                stateData.save(stateFile);
-            } catch (IOException e) {
-                plugin.getLogger().warning("Failed to save player state: " + e.getMessage());
-            }
-        });
+        // 保存状态数据
+        config.set("location", data.getOriginalLocation());
+        config.set("gamemode", data.getOriginalGameMode().name());
+        config.set("target", data.getTargetPlayer().getUniqueId().toString());
+        config.set("startTime", data.getStartTime());
+
+        try {
+            config.save(stateFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save state for player: " + player.getName());
+        }
     }
 
-    public void restorePlayerState(Player player) {
-        String path = player.getUniqueId().toString();
-        if (!stateData.contains(path)) {
-            return;
+    public PeekData getPlayerState(Player player) {
+        File stateFile = new File(statesDir, player.getUniqueId() + ".yml");
+        if (!stateFile.exists()) {
+            return null;
         }
 
-        Location loc = (Location) stateData.get(path + ".location");
-        GameMode gameMode = GameMode.valueOf(stateData.getString(path + ".gamemode"));
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(stateFile);
+        try {
+            Location location = (Location) config.get("location");
+            GameMode gameMode = GameMode.valueOf(config.getString("gamemode"));
+            UUID targetUUID = UUID.fromString(config.getString("target"));
+            Player target = plugin.getServer().getPlayer(targetUUID);
+            long startTime = config.getLong("startTime");
 
-        plugin.getServer().getRegionScheduler().execute(plugin, loc, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-
-            player.teleportAsync(loc).thenAccept(success -> {
-                if (success) {
-                    player.setGameMode(gameMode);
-                    clearPlayerState(player);
-                }
-            });
-        });
+            return new PeekData(location, gameMode, target, startTime);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to load state for player: " + player.getName());
+            return null;
+        }
     }
 
     public void clearPlayerState(Player player) {
-        String path = player.getUniqueId().toString();
-        stateData.set(path, null);
-
-        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
-            try {
-                stateData.save(stateFile);
-            } catch (IOException e) {
-                plugin.getLogger().warning("Failed to clear player state: " + e.getMessage());
-            }
-        });
+        File stateFile = new File(statesDir, player.getUniqueId() + ".yml");
+        if (stateFile.exists()) {
+            stateFile.delete();
+        }
     }
 }

@@ -1,19 +1,18 @@
 package ict.minesunshineone.peek.util;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.File;
 
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public class Messages {
 
     private final PeekPlugin plugin;
-    private final Map<String, String> messages = new HashMap<>();
+    private YamlConfiguration messages;
 
     public Messages(PeekPlugin plugin) {
         this.plugin = plugin;
@@ -21,49 +20,60 @@ public class Messages {
     }
 
     private void loadMessages() {
-        FileConfiguration config = plugin.getConfig();
-        String language = config.getString("language", "zh_CN");
-        String path = String.format("messages.%s", language);
+        String language = plugin.getConfig().getString("language", "zh_CN");
+        File langFile = new File(plugin.getDataFolder(), "lang/" + language + ".yml");
 
-        var section = config.getConfigurationSection(path);
-        if (section == null) {
-            plugin.getLogger().severe(String.format("Could not find messages section for language: %s", language));
-            return;
+        // 如果语言文件不存在，保存默认的语言文件
+        if (!langFile.exists()) {
+            langFile.getParentFile().mkdirs();
+            plugin.saveResource("lang/" + language + ".yml", false);
         }
 
-        for (String key : section.getKeys(false)) {
-            messages.put(key, config.getString(path + "." + key));
+        messages = YamlConfiguration.loadConfiguration(langFile);
+        if (!messages.contains("messages")) {
+            plugin.getLogger().severe("Could not find messages section for language: " + language);
+            // 加载默认消息作为备份
+            messages = new YamlConfiguration();
+            messages.createSection("messages");
         }
     }
 
-    public String get(String key, String... replacements) {
-        String message = messages.getOrDefault(key, "Missing message: " + key);
-        for (int i = 0; i < replacements.length; i += 2) {
-            if (i + 1 < replacements.length) {
-                message = message.replace("{" + replacements[i] + "}", replacements[i + 1]);
+    public void send(Player player, String key, String... placeholders) {
+        String message = messages.getString("messages." + key);
+        if (message == null) {
+            plugin.getLogger().warning("Missing message key: " + key);
+            return;
+        }
+
+        // 替换占位符
+        for (int i = 0; i < placeholders.length; i += 2) {
+            if (i + 1 < placeholders.length) {
+                message = message.replace("{" + placeholders[i] + "}", placeholders[i + 1]);
             }
         }
-        return message;
+
+        player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                messages.getString("messages.prefix", "") + message));
     }
 
-    public void send(CommandSender sender, String key, String... replacements) {
-        String message = get(key, replacements);
+    public void send(CommandSender sender, String key, String... placeholders) {
+        String message = messages.getString("messages." + key);
         if (message == null) {
+            plugin.getLogger().warning("Missing message key: " + key);
             return;
         }
 
-        if (sender instanceof Player) {
-            ((Player) sender).sendMessage(LegacyComponentSerializer.legacyAmpersand().deserialize(message));
-        } else {
-            sender.sendMessage(message);
+        for (int i = 0; i < placeholders.length; i += 2) {
+            if (i + 1 < placeholders.length) {
+                message = message.replace("{" + placeholders[i] + "}", placeholders[i + 1]);
+            }
         }
+
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                messages.getString("messages.prefix", "") + message));
     }
 
-    public void sendError(CommandSender sender, String key, Throwable error) {
-        send(sender, key);
-        if (plugin.getConfig().getBoolean("debug", false)) {
-            plugin.getLogger().warning(String.format("Error: %s - %s",
-                    key, error.getMessage()));
-        }
+    public String get(String key) {
+        return messages.getString("messages." + key);
     }
 }

@@ -64,7 +64,7 @@ public class PeekStateHandler {
         startRangeChecker(peeker, target);
     }
 
-    public void endPeek(Player peeker) {
+    public void endPeek(Player peeker, boolean shouldRestore) {
         if (peeker == null) {
             plugin.getLogger().warning("Attempted to end peek with null player");
             return;
@@ -90,12 +90,20 @@ public class PeekStateHandler {
             // 设置冷却
             plugin.getCooldownManager().setCooldown(peeker);
 
-            restorePlayerState(peeker, data);
+            if (shouldRestore && peeker.isOnline()) {
+                restorePlayerState(peeker, data);
+            }
+
             activePeeks.remove(peeker);
-            plugin.getStateManager().clearPlayerState(peeker);
+
+            if (shouldRestore) {
+                plugin.getStateManager().clearPlayerState(peeker);
+            }
 
             // 发送消息
-            plugin.getMessages().send(peeker, "peek-end");
+            if (peeker.isOnline()) {
+                plugin.getMessages().send(peeker, "peek-end");
+            }
             if (target != null && target.isOnline()) {
                 plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
             }
@@ -110,15 +118,22 @@ public class PeekStateHandler {
         stopRangeChecker(peeker);
     }
 
+    public void endPeek(Player peeker) {
+        endPeek(peeker, true);
+    }
+
     private void teleportAndSetGameMode(Player peeker, Player target) {
-        plugin.getServer().getRegionScheduler().run(plugin, target.getLocation(), task -> {
-            peeker.setGameMode(GameMode.SPECTATOR);
-            peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
-                if (!success) {
-                    plugin.getMessages().send(peeker, "teleport-failed");
-                    endPeek(peeker);
-                }
-            });
+        // 先传送到目标位置
+        peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
+            if (success) {
+                // 传送成功后，在新位置执行游戏模式切换
+                plugin.getServer().getRegionScheduler().run(plugin, target.getLocation(), task -> {
+                    peeker.setGameMode(GameMode.SPECTATOR);
+                });
+            } else {
+                plugin.getMessages().send(peeker, "teleport-failed");
+                endPeek(peeker);
+            }
         });
     }
 
@@ -179,27 +194,36 @@ public class PeekStateHandler {
 
     private void startRangeChecker(Player peeker, Player target) {
         ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                peeker.getLocation(),
+                target.getLocation(),
                 scheduledTask -> {
-                    // 检查距离，包括下线、不同世界、超出距离等所有情况
+                    if (!peeker.isOnline() || !target.isOnline()) {
+                        endPeek(peeker);
+                        return;
+                    }
+
                     try {
-                        double distance = peeker.getLocation().distance(target.getLocation());
-                        if (distance > maxPeekDistance) {
-                            plugin.getMessages().send(peeker, "range-exceeded");
-                            endPeek(peeker);
+                        // 如果在同一个世界才检查距离
+                        if (peeker.getWorld().equals(target.getWorld())) {
+                            double distance = peeker.getLocation().distance(target.getLocation());
+                            if (distance > maxPeekDistance) {
+                                plugin.getMessages().send(peeker, "range-exceeded");
+                                endPeek(peeker);
+                            }
+                        } // 不同世界时自动跟随传送
+                        else {
+                            teleportAndSetGameMode(peeker, target);
                         }
                     } catch (Exception e) {
-                        // 任何异常（下线、不同世界等）都视为超出范围
-                        plugin.getMessages().send(peeker, "range-exceeded");
+                        // 只处理其他异常
                         endPeek(peeker);
                     }
                 },
-                0L, 100L); // 5秒 = 100 ticks
+                1L, 100L);
 
         rangeCheckers.put(peeker, task);
     }
 
-    private void stopRangeChecker(Player peeker) {
+    public void stopRangeChecker(Player peeker) {
         ScheduledTask task = rangeCheckers.remove(peeker);
         if (task != null) {
             task.cancel();
@@ -211,5 +235,9 @@ public class PeekStateHandler {
             task.cancel();
             rangeCheckers.remove(peeker);
         });
+    }
+
+    public void removeActivePeek(Player player) {
+        activePeeks.remove(player);
     }
 }

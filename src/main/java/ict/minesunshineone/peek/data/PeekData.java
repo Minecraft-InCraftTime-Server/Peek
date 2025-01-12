@@ -1,7 +1,11 @@
 package ict.minesunshineone.peek.data;
 
+import java.util.UUID;
+
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 public class PeekData {
@@ -41,5 +45,15 @@ public class PeekData {
 
     public void setExiting(boolean exiting) {
         this.exiting = exiting;
+    }
+
+    public static PeekData fromConfig(YamlConfiguration config) {
+        Location location = (Location) config.get("location");
+        GameMode gameMode = GameMode.valueOf(config.getString("gamemode"));
+        UUID targetUUID = UUID.fromString(config.getString("target"));
+        Player target = Bukkit.getPlayer(targetUUID);
+        long startTime = config.getLong("startTime");
+
+        return new PeekData(location, gameMode, target, startTime);
     }
 }

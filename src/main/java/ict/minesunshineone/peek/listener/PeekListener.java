@@ -6,9 +6,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.Location;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.command.PeekCommand;
+import java.util.Map;
+import java.util.HashMap;
+import ict.minesunshineone.peek.data.PeekData;
 
 public class PeekListener implements Listener {
 
@@ -20,30 +24,65 @@ public class PeekListener implements Listener {
         this.peekCommand = peekCommand;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
 
-        // 如果退出的玩家正在观察别人，结束观察状态
+        // 如果是观察者下线，只记录状态，不执行恢复操作
         if (plugin.getStateHandler().getActivePeeks().containsKey(player)) {
-            plugin.getStateHandler().endPeek(player);
+            // 只保存状态，不调用endPeek
+            plugin.getStateManager().savePlayerState(player,
+                    plugin.getStateHandler().getActivePeeks().get(player));
+
+            // 移除活跃观察记录，但保留状态文件
+            plugin.getStateHandler().removeActivePeek(player);
+
+            // 停止距离检查器
+            plugin.getStateHandler().stopRangeChecker(player);
         }
 
-        // 如果退出的玩家正在被观察，通知观察者
-        plugin.getStateHandler().getActivePeeks().forEach((peeker, data) -> {
-            if (data.getTargetPlayer().equals(player)) {
-                plugin.getStateHandler().endPeek(peeker);
-                plugin.getMessages().send(peeker, "target-offline");
+        // 如果是被观察者下线，结束所有观察他的玩家的观察状态
+        for (Map.Entry<Player, PeekData> entry
+                : new HashMap<>(plugin.getStateHandler().getActivePeeks()).entrySet()) {
+            if (player.equals(entry.getValue().getTargetPlayer())) {
+                plugin.getStateHandler().endPeek(entry.getKey());
             }
-        });
+        }
 
-        // 如果玩家有待处理的请求，取消它们
+        // 取消所有相关的请求
         plugin.getPrivacyManager().cancelAllRequests(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        plugin.getStateManager().restorePlayerState(player);
+
+        // 检查是否有未恢复的状态
+        PeekData savedState = plugin.getStateManager().getPlayerState(player);
+        if (savedState != null) {
+            // 恢复玩家状态
+            plugin.getServer().getRegionScheduler().run(plugin,
+                    savedState.getOriginalLocation(),
+                    task -> {
+                        player.teleportAsync(savedState.getOriginalLocation())
+                                .thenAccept(success -> {
+                                    if (success) {
+                                        player.setGameMode(savedState.getOriginalGameMode());
+                                        plugin.getStateManager().clearPlayerState(player);
+                                    } else {
+                                        Location spawnLoc = player.getBedSpawnLocation() != null
+                                                ? player.getBedSpawnLocation()
+                                                : player.getWorld().getSpawnLocation();
+
+                                        player.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
+                                            if (spawnSuccess) {
+                                                player.setGameMode(savedState.getOriginalGameMode());
+                                            }
+                                            plugin.getStateManager().clearPlayerState(player);
+                                        });
+                                    }
+                                });
+                    });
+        }
     }
 }

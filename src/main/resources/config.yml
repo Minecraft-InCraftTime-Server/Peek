@@ -4,13 +4,16 @@ debug: false
 # 限制设置
 limits:
   max-peek-distance: 50.0  # 最大观察距离
+  cooldown:
+    enabled: true         # 是否启用观察冷却
+    duration: 90        # 观察冷却时间(秒)
 
 # 隐私设置
 privacy:
   request-timeout: 30      # 请求超时时间(秒)
   cooldown:
     enabled: true         # 是否启用请求冷却
-    duration: 120         # 冷却时间(秒)
+    duration: 90        # 冷却时间(秒)
   sounds:
     request: BLOCK_NOTE_BLOCK_PLING    # 请求音效
     accept: ENTITY_PLAYER_LEVELUP      # 接受音效
@@ -26,26 +29,10 @@ statistics:
   enabled: true           # 是否启用统计
   save-interval: 600      # 自动保存间隔(秒)
 
-# 消息设置
-messages:
-  prefix: "&7[&bPeek&7] "
-  peek-start: "&a你开始观察 &e{player}"
-  peek-end: "&a你结束了观察"
-  being-peeked: "&e{player} &a正在观察你"
-  peek-end-target: "&e{player} &a结束了对你的观察"
-  already-peeking: "&c你已经在观察其他玩家了"
-  range-exceeded: "&c你离目标太远了，观察已结束"
-  teleport-failed: "&c传送失败"
-  privacy-mode-enabled: "&a隐私模式已启用"
-  privacy-mode-disabled: "&a隐私模式已禁用"
-  peek-request: "&e{player} &a请求观察你 &7(/peek accept 接受, /peek deny 拒绝)"
-  request-sent: "&a已向 &e{player} &a发送观察请求"
-  request-timeout: "&c请求已超时"
-  request-timeout-target: "&c观察请求已超时"
-  request-denied: "&c对方拒绝了你的请求"
-  request-already-pending: "&c你已经有一个待处理的请求了"
-  request-cooldown: "&c你需要等待 &e{time} &c秒才能再次发送请求"
-  no-pending-request: "&c没有待处理的请求"
-  request-expired: "&c请求已过期"
-  stats-disabled: "&c统计功能已禁用"
-  stats-self: "&a你的观察统计:\n&7观察次数: &e{peek_count}\n&7被观察次数: &e{peeked_count}\n&7总观察时长: &e{peek_duration} &7分钟"
+# 文件设置
+files:
+  stats: "stats.yml"      # 统计文件名
+  states: "states.yml"    # 状态文件名
+
+# 语言设置
+language: "zh_CN"  # 默认语言
