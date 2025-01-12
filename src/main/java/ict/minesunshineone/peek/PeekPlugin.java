@@ -72,14 +72,12 @@ public class PeekPlugin extends JavaPlugin {
     public void onDisable() {
         if (stateHandler != null) {
             stateHandler.cleanup();
-            // 使用 GlobalRegionScheduler 来处理清理
-            getServer().getGlobalRegionScheduler().run(this, task -> {
-                new HashMap<>(stateHandler.getActivePeeks()).forEach((uuid, data) -> {
-                    Player player = getServer().getPlayer(uuid);
-                    if (player != null && player.isOnline()) {
-                        stateHandler.endPeek(player);
-                    }
-                });
+            // 直接清理，不要使用调度器
+            new HashMap<>(stateHandler.getActivePeeks()).forEach((uuid, data) -> {
+                Player player = getServer().getPlayer(uuid);
+                if (player != null && player.isOnline()) {
+                    stateHandler.endPeek(player, true);
+                }
             });
         }
 
