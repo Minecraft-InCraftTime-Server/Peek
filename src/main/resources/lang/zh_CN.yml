@@ -1,5 +1,5 @@
 messages:
-  prefix: "&d[贴贴] "
+  prefix: ""
   command-player-only: "  &d这个魔法只能由玩家施展哦~"
   no-permission: "  &d抱歉，你还没有获得使用这个魔法的权限呢~"
   usage: "  &d施法指南：\n&d➤ &f/peek <玩家名> &7贴贴指定玩家\n&d➤ &f/peek exit &7退出贴贴模式\n&d➤ &f/peek stats &7查看贴贴统计\n&d➤ &f/peek privacy &7切换私人模式\n&d➤ &f/peek accept &7接受贴贴请求\n&d➤ &f/peek deny &7拒绝贴贴请求"
@@ -45,7 +45,7 @@ messages:
   teleport-failed-retry: "  &c传送失败了，再试一次..."
   teleport-failed-spawn: "  &c无法返回原位置，已将你传送到重生点~"
   target-no-peek-permission: "  &d这位魔法师设置了防窥魔法护盾，暂时无法贴贴呢~"
-  peek-mode-spectator: "  &d已切换到观察者模式，现在可以自由穿墙啦~"
+  peek-mode-spectator: "&d已切换到观察者模式，现在可以自由穿墙啦~"
   peek-mode-restored: "  &d已恢复到之前的游戏模式啦~"
   request-accept-success: "  &d✨ 已接受 &f{player} &d的贴贴请求~"
   request-deny-success: "  &d已拒绝 &f{player} &d的贴贴请求~"

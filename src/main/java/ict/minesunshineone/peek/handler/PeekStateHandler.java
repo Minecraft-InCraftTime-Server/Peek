@@ -123,17 +123,18 @@ public class PeekStateHandler {
     }
 
     private void teleportAndSetGameMode(Player peeker, Player target) {
-        // 先传送到目标位置
-        peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
-            if (success) {
-                // 传送成功后，在新位置执行游戏模式切换
-                plugin.getServer().getRegionScheduler().run(plugin, target.getLocation(), task -> {
-                    peeker.setGameMode(GameMode.SPECTATOR);
-                });
-            } else {
-                plugin.getMessages().send(peeker, "teleport-failed");
-                endPeek(peeker);
-            }
+        // 先切换游戏模式
+        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
+            peeker.setGameMode(GameMode.SPECTATOR);
+            plugin.getMessages().send(peeker, "peek-mode-spectator");
+
+            // 切换完成后再传送
+            peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
+                if (!success) {
+                    plugin.getMessages().send(peeker, "teleport-failed");
+                    endPeek(peeker);
+                }
+            });
         });
     }
 
