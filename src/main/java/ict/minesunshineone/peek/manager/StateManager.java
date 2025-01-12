@@ -32,7 +32,7 @@ public class StateManager {
         // 保存状态数据
         config.set("location", data.getOriginalLocation());
         config.set("gamemode", data.getOriginalGameMode().name());
-        config.set("target", data.getTargetPlayer().getUniqueId().toString());
+        config.set("target", data.getTargetUUID().toString());
         config.set("startTime", data.getStartTime());
 
         try {
@@ -53,10 +53,9 @@ public class StateManager {
             Location location = (Location) config.get("location");
             GameMode gameMode = GameMode.valueOf(config.getString("gamemode"));
             UUID targetUUID = UUID.fromString(config.getString("target"));
-            Player target = plugin.getServer().getPlayer(targetUUID);
             long startTime = config.getLong("startTime");
 
-            return new PeekData(location, gameMode, target, startTime);
+            return new PeekData(location, gameMode, targetUUID, startTime);
         } catch (Exception e) {
             plugin.getLogger().warning(String.format("无法加载玩家 %s 的状态", player.getName()));
             return null;

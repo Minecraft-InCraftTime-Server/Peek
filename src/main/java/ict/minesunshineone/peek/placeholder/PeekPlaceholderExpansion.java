@@ -46,7 +46,7 @@ public class PeekPlaceholderExpansion extends PlaceholderExpansion {
                 case "total_duration" ->
                     String.valueOf(stats.getTotalDuration());
                 case "is_peeking" ->
-                    String.valueOf(plugin.getStateHandler().getActivePeeks().containsKey(player));
+                    String.valueOf(plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId()));
                 case "is_private" ->
                     String.valueOf(plugin.getPrivacyManager().isPrivateMode(player));
                 default ->

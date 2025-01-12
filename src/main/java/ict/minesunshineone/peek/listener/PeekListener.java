@@ -2,6 +2,7 @@ package ict.minesunshineone.peek.listener;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -27,10 +28,10 @@ public class PeekListener implements Listener {
         Player player = event.getPlayer();
 
         // 如果是观察者下线，只记录状态，不执行恢复操作
-        if (plugin.getStateHandler().getActivePeeks().containsKey(player)) {
+        if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
             // 只保存状态，不调用endPeek
             plugin.getStateManager().savePlayerState(player,
-                    plugin.getStateHandler().getActivePeeks().get(player));
+                    plugin.getStateHandler().getActivePeeks().get(player.getUniqueId()));
 
             // 移除活跃观察记录，但保留状态文件
             plugin.getStateHandler().removeActivePeek(player);
@@ -40,10 +41,12 @@ public class PeekListener implements Listener {
         }
 
         // 如果是被观察者下线，结束所有观察他的玩家的观察状态
-        for (Map.Entry<Player, PeekData> entry
-                : new HashMap<>(plugin.getStateHandler().getActivePeeks()).entrySet()) {
-            if (player.equals(entry.getValue().getTargetPlayer())) {
-                plugin.getStateHandler().endPeek(entry.getKey());
+        for (Map.Entry<UUID, PeekData> entry : new HashMap<>(plugin.getStateHandler().getActivePeeks()).entrySet()) {
+            if (player.getUniqueId().equals(entry.getValue().getTargetUUID())) {
+                Player peeker = plugin.getServer().getPlayer(entry.getKey());
+                if (peeker != null) {
+                    plugin.getStateHandler().endPeek(peeker);
+                }
             }
         }
 

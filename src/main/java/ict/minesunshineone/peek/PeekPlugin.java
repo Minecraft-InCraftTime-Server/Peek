@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import ict.minesunshineone.peek.command.PeekCommand;
@@ -73,8 +74,9 @@ public class PeekPlugin extends JavaPlugin {
             stateHandler.cleanup();
             // 使用 GlobalRegionScheduler 来处理清理
             getServer().getGlobalRegionScheduler().run(this, task -> {
-                new HashMap<>(stateHandler.getActivePeeks()).forEach((player, data) -> {
-                    if (player.isOnline()) {
+                new HashMap<>(stateHandler.getActivePeeks()).forEach((uuid, data) -> {
+                    Player player = getServer().getPlayer(uuid);
+                    if (player != null && player.isOnline()) {
                         stateHandler.endPeek(player);
                     }
                 });

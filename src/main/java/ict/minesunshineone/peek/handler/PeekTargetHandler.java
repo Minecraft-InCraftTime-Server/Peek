@@ -25,7 +25,7 @@ public class PeekTargetHandler {
             return false;
         }
 
-        if (plugin.getStateHandler().getActivePeeks().containsKey(target)) {
+        if (plugin.getStateHandler().getActivePeeks().containsKey(target.getUniqueId())) {
             plugin.getMessages().send(peeker, "target-is-peeking");
             return false;
         }

@@ -171,7 +171,7 @@ public class PrivacyManager {
                 Sound sound = Sound.valueOf(soundName);
                 player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
             } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning("Invalid sound name: " + soundName);
+                plugin.getLogger().warning(String.format("无效的声音名称: %s", soundName));
             }
         }
     }

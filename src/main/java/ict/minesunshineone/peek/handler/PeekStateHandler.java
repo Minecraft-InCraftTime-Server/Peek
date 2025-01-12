@@ -3,6 +3,7 @@ package ict.minesunshineone.peek.handler;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -16,8 +17,8 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 public class PeekStateHandler {
 
     private final PeekPlugin plugin;
-    private final Map<Player, PeekData> activePeeks = new HashMap<>();
-    private final Map<Player, ScheduledTask> rangeCheckers = new HashMap<>();
+    private final Map<UUID, PeekData> activePeeks = new HashMap<>();
+    private final Map<UUID, ScheduledTask> rangeCheckers = new HashMap<>();
     private final Object rangeCheckersLock = new Object();
     private final double maxPeekDistance;
 
@@ -34,7 +35,7 @@ public class PeekStateHandler {
 
         // 防止并发修改
         synchronized (activePeeks) {
-            if (activePeeks.containsKey(peeker)) {
+            if (activePeeks.containsKey(peeker.getUniqueId())) {
                 plugin.getMessages().send(peeker, "already-peeking");
                 return;
             }
@@ -43,11 +44,11 @@ public class PeekStateHandler {
             PeekData data = new PeekData(
                     peeker.getLocation().clone(),
                     peeker.getGameMode(),
-                    target,
+                    target.getUniqueId(),
                     System.currentTimeMillis()
             );
 
-            activePeeks.put(peeker, data);
+            activePeeks.put(peeker.getUniqueId(), data);
             plugin.getStateManager().savePlayerState(peeker, data);
             plugin.getStatisticsManager().recordPeekStart(peeker, target);
 
@@ -69,7 +70,7 @@ public class PeekStateHandler {
         }
 
         synchronized (activePeeks) {
-            PeekData data = activePeeks.get(peeker);
+            PeekData data = activePeeks.get(peeker.getUniqueId());
             if (data == null) {
                 return;
             }
@@ -79,7 +80,7 @@ public class PeekStateHandler {
             }
 
             data.setExiting(true);
-            Player target = data.getTargetPlayer();
+            Player target = plugin.getServer().getPlayer(data.getTargetUUID());
 
             // 记录统计
             long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
@@ -109,7 +110,7 @@ public class PeekStateHandler {
             }
 
             // 最后才移除活动peek
-            activePeeks.remove(peeker);
+            activePeeks.remove(peeker.getUniqueId());
         }
     }
 
@@ -175,7 +176,7 @@ public class PeekStateHandler {
         });
     }
 
-    public Map<Player, PeekData> getActivePeeks() {
+    public Map<UUID, PeekData> getActivePeeks() {
         return Collections.unmodifiableMap(activePeeks);
     }
 
@@ -228,13 +229,13 @@ public class PeekStateHandler {
                     },
                     1L, 100L);
 
-            rangeCheckers.put(peeker, task);
+            rangeCheckers.put(peeker.getUniqueId(), task);
         }
     }
 
     public void stopRangeChecker(Player peeker) {
         synchronized (rangeCheckersLock) {
-            ScheduledTask task = rangeCheckers.remove(peeker);
+            ScheduledTask task = rangeCheckers.remove(peeker.getUniqueId());
             if (task != null) {
                 task.cancel();
             }
@@ -251,6 +252,6 @@ public class PeekStateHandler {
     }
 
     public void removeActivePeek(Player player) {
-        activePeeks.remove(player);
+        activePeeks.remove(player.getUniqueId());
     }
 }

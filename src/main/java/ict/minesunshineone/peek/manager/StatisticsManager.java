@@ -85,11 +85,11 @@ public class StatisticsManager {
                     playerStats.setTotalDuration(totalDuration);
                     stats.put(uuid, playerStats);
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("Invalid UUID in stats file: " + uuidStr);
+                    plugin.getLogger().warning(String.format("无效的 UUID: %s", uuidStr));
                 }
             }
         } catch (Exception e) {
-            plugin.getLogger().severe("Failed to load stats: " + e.getMessage());
+            plugin.getLogger().severe(String.format("无法加载统计数据: %s", e.getMessage()));
         }
     }
 
@@ -109,7 +109,7 @@ public class StatisticsManager {
         try {
             config.save(statsFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("Failed to save stats: " + e.getMessage());
+            plugin.getLogger().severe(String.format("无法保存统计数据: %s", e.getMessage()));
         }
     }
 
@@ -135,11 +135,11 @@ public class StatisticsManager {
             return;
         }
 
-        PlayerStats stats = getPlayerStats(player);
+        PlayerStats playerStats = getPlayerStats(player);
         plugin.getMessages().send(player, "stats-self",
-                "peek_count", String.valueOf(stats.getPeekCount()),
-                "peeked_count", String.valueOf(stats.getPeekedCount()),
-                "peek_duration", String.valueOf(stats.getTotalDuration() / 60));
+                "peek_count", String.valueOf(playerStats.getPeekCount()),
+                "peeked_count", String.valueOf(playerStats.getPeekedCount()),
+                "peek_duration", String.valueOf(playerStats.getTotalDuration() / 60));
     }
 
     public static class PlayerStats {
