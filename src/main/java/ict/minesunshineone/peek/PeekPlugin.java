@@ -1,13 +1,22 @@
 package ict.minesunshineone.peek;
 
 import java.util.HashMap;
-import java.util.Objects;
+import java.util.Map;
 
-import org.bukkit.command.PluginCommand;
-import org.bukkit.entity.Player;
+import org.bukkit.Sound;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import ict.minesunshineone.peek.command.PeekCommand;
+import ict.minesunshineone.peek.handler.PeekStateHandler;
+import ict.minesunshineone.peek.handler.PeekTargetHandler;
+import ict.minesunshineone.peek.listener.PeekListener;
+import ict.minesunshineone.peek.manager.CooldownManager;
+import ict.minesunshineone.peek.manager.PrivacyManager;
+import ict.minesunshineone.peek.manager.StateManager;
+import ict.minesunshineone.peek.manager.StatisticsManager;
+import ict.minesunshineone.peek.placeholder.PeekPlaceholderExpansion;
+import ict.minesunshineone.peek.util.Messages;
 
 /**
  * Peek插件主类 用于管理插件的生命周期和配置
@@ -15,160 +24,139 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 public class PeekPlugin extends JavaPlugin {
 
     private Messages messages;        // 消息管理器
-    private int maxPeekDuration;     // 最大观察时间（秒）
-    private Statistics statistics;
+    private StateManager stateManager;
+    private PeekStateHandler stateHandler;
+    private PeekTargetHandler targetHandler;
     private CooldownManager cooldownManager;
-    private boolean debug;
-    private PeekCommand peekCommand;
-    private OfflinePeekManager offlinePeekManager;
-    private PeekRangeChecker rangeChecker;
     private PrivacyManager privacyManager;
+    private StatisticsManager statisticsManager;
 
     @Override
     public void onEnable() {
         // 加载配置文件
         saveDefaultConfig();
-        loadConfig();
+        validateConfig();
 
         // 初始化各个管理器
-        messages = new Messages(this);
-        cooldownManager = new CooldownManager(this);
-
-        if (getConfig().getBoolean("statistics.enabled", true)) {
-            statistics = new Statistics(this);
-        }
-
-        // 创建命令执行器实例
-        peekCommand = new PeekCommand(this);
+        this.messages = new Messages(this);
+        this.stateManager = new StateManager(this);
+        this.stateHandler = new PeekStateHandler(this);
+        this.targetHandler = new PeekTargetHandler(this);
+        this.cooldownManager = new CooldownManager(this);
+        this.privacyManager = new PrivacyManager(this);
+        this.statisticsManager = new StatisticsManager(this);
 
         // 注册命令
-        PluginCommand peekCmd = Objects.requireNonNull(getCommand("peek"), "命令'peek'未在plugin.yml中注册");
-        peekCmd.setExecutor(peekCommand);
-        peekCmd.setTabCompleter(peekCommand);
+        PeekCommand peekCommand = new PeekCommand(this);
+        getCommand("peek").setExecutor(peekCommand);
+        getCommand("peek").setTabCompleter(peekCommand);
 
-        // 注册事件监听器
+        // 注册监听器
         getServer().getPluginManager().registerEvents(new PeekListener(this, peekCommand), this);
 
-        offlinePeekManager = new OfflinePeekManager(this);
-
-        // 如果服务器安装了 PlaceholderAPI,注册变量
+        // 如果有PlaceholderAPI，注册变量
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new PeekPlaceholderExpansion(this).register();
         }
-
-        // 初始化范围检查器
-        rangeChecker = new PeekRangeChecker(this, peekCommand);
-
-        this.privacyManager = new PrivacyManager(this);
 
         getLogger().info("Peek插件已启用！");
     }
 
     @Override
     public void onDisable() {
-        // 关闭范围检查器
-        if (rangeChecker != null) {
-            rangeChecker.shutdown();
-        }
-
-        // 结束所有玩家的观察状态
-        if (peekCommand != null) {
-            // 清理所有计时器
-            peekCommand.getPeekTimers().values().forEach(ScheduledTask::cancel);
-            peekCommand.getPeekTimers().clear();
-
-            new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {
-                if (player.isOnline()) {
-                    // 保存状态
-                    offlinePeekManager.saveOfflinePlayerState(player, data);
-
-                    try {
-                        getServer().getRegionScheduler().execute(this, player.getLocation(), () -> {
-                            player.setGameMode(data.getOriginalGameMode());
-                            player.teleportAsync(data.getOriginalLocation()).thenAccept(result -> {
-                                if (result && getStatistics() != null) {
-                                    long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
-                                    getStatistics().recordPeekDuration(player, duration);
-                                }
-                            });
-
-                            player.sendMessage(messages.get("peek-end"));
-
-                            Player target = data.getTargetPlayer();
-                            if (target != null && target.isOnline()) {
-                                target.sendMessage(messages.get("peek-end-target",
-                                        "player", player.getName()));
-                            }
-                        });
-                    } catch (Exception e) {
-                        getLogger().warning(String.format("无法在关服时处理玩家 %s 的观察状态: %s",
-                                player.getName(), e.getMessage()));
+        if (stateHandler != null) {
+            stateHandler.cleanup();
+            // 使用 GlobalRegionScheduler 来处理清理
+            getServer().getGlobalRegionScheduler().run(this, task -> {
+                new HashMap<>(stateHandler.getActivePeeks()).forEach((player, data) -> {
+                    if (player.isOnline()) {
+                        stateHandler.endPeek(player);
                     }
-                }
+                });
             });
-            peekCommand.getPeekingPlayers().clear();
         }
 
-        // 保存统计数据
-        if (statistics != null) {
-            statistics.saveStats();
-        }
-
-        if (privacyManager != null) {
-            privacyManager.savePrivacySettings();
+        if (statisticsManager != null) {
+            statisticsManager.saveStats();
         }
 
         getLogger().info("Peek插件已禁用！");
     }
 
-    /**
-     * 加载配置文件 读取最大观察时间等配置项
-     */
-    private void loadConfig() {
-        reloadConfig();
-        // 确保配置节点存在
-        if (!getConfig().isSet("privacy")) {
-            getConfig().set("privacy.request-timeout", 30);
-            getConfig().set("privacy.cooldown.enabled", true);
-            getConfig().set("privacy.cooldown.duration", 120);
-            getConfig().set("privacy.sounds.request", "BLOCK_NOTE_BLOCK_PLING");
-            getConfig().set("privacy.sounds.accept", "ENTITY_PLAYER_LEVELUP");
-            getConfig().set("privacy.sounds.deny", "ENTITY_VILLAGER_NO");
+    private void validateConfig() {
+        FileConfiguration config = getConfig();
+        boolean needsSave = false;
+
+        // 检查并设置必要的配置项
+        Map<String, Object> defaults = new HashMap<>();
+        defaults.put("language", "zh_CN");
+        defaults.put("max-peek-duration", 5);
+        defaults.put("cooldowns.peek", 120);
+        defaults.put("statistics.enabled", true);
+        defaults.put("statistics.save-interval", 600);
+        defaults.put("debug", false);
+        defaults.put("limits.max-peek-distance", 50.0);
+        defaults.put("privacy.request-timeout", 30);
+        defaults.put("privacy.cooldown.enabled", true);
+        defaults.put("privacy.cooldown.duration", 120);
+
+        // 声音设置
+        defaults.put("sounds.start-peek", "BLOCK_NOTE_BLOCK_PLING");
+        defaults.put("sounds.end-peek", "BLOCK_NOTE_BLOCK_BASS");
+        defaults.put("privacy.sounds.request", "BLOCK_NOTE_BLOCK_PLING");
+        defaults.put("privacy.sounds.accept", "ENTITY_PLAYER_LEVELUP");
+        defaults.put("privacy.sounds.deny", "ENTITY_VILLAGER_NO");
+
+        for (Map.Entry<String, Object> entry : defaults.entrySet()) {
+            if (!config.contains(entry.getKey())) {
+                config.set(entry.getKey(), entry.getValue());
+                needsSave = true;
+            }
+        }
+
+        // 验证声音名称
+        for (String key : config.getConfigurationSection("sounds").getKeys(false)) {
+            String soundName = config.getString("sounds." + key);
+            try {
+                Sound.valueOf(soundName);
+            } catch (IllegalArgumentException e) {
+                getLogger().warning("Invalid sound name in config: " + soundName);
+                config.set("sounds." + key, defaults.get("sounds." + key));
+                needsSave = true;
+            }
+        }
+
+        if (needsSave) {
             saveConfig();
         }
-        this.maxPeekDuration = getConfig().getInt("max-peek-duration", 5) * 60;
-        this.debug = getConfig().getBoolean("debug", false);
     }
 
+    // Getters
     public Messages getMessages() {
         return messages;
     }
 
-    public int getMaxPeekDuration() {
-        return maxPeekDuration;
+    public StateManager getStateManager() {
+        return stateManager;
     }
 
-    public Statistics getStatistics() {
-        return statistics;
+    public PeekStateHandler getStateHandler() {
+        return stateHandler;
+    }
+
+    public PeekTargetHandler getTargetHandler() {
+        return targetHandler;
     }
 
     public CooldownManager getCooldownManager() {
         return cooldownManager;
     }
 
-    public boolean isDebugEnabled() {
-        return debug;
-    }
-
-    public OfflinePeekManager getOfflinePeekManager() {
-        return offlinePeekManager;
-    }
-
     public PrivacyManager getPrivacyManager() {
         return privacyManager;
     }
 
-    public PeekCommand getPeekCommand() {
-        return peekCommand;
+    public StatisticsManager getStatisticsManager() {
+        return statisticsManager;
     }
 }

@@ -1,86 +1,51 @@
-# Peek插件配置文件
+# 调试模式
+debug: false
 
-# 消息语言 (en_US 或 zh_CN)
-language: zh_CN
+# 限制设置
+limits:
+  max-peek-distance: 50.0  # 最大观察距离
 
-# 最大观察时间（分钟，0表示无限制）
-max-peek-duration: 5
+# 隐私设置
+privacy:
+  request-timeout: 30      # 请求超时时间(秒)
+  cooldown:
+    enabled: true         # 是否启用请求冷却
+    duration: 120         # 冷却时间(秒)
+  sounds:
+    request: BLOCK_NOTE_BLOCK_PLING    # 请求音效
+    accept: ENTITY_PLAYER_LEVELUP      # 接受音效
+    deny: BLOCK_ANVIL_LAND            # 拒绝音效
 
-# 冷却时间设置（秒）
-cooldowns:
-  peek: 120     # 观察指令冷却时间
+# 声音设置
+sounds:
+  start-peek: ENTITY_ENDERMAN_TELEPORT  # 开始观察音效
+  end-peek: ENTITY_ENDERMAN_TELEPORT    # 结束观察音效
 
 # 统计设置
 statistics:
   enabled: true           # 是否启用统计
-  save-interval: 600      # 统计保存间隔（秒）
+  save-interval: 600      # 自动保存间隔(秒)
 
-# 声音提示设置
-sounds:
-  # 开始被观察时的声音
-  start-peek: BLOCK_NOTE_BLOCK_PLING
-  # 结束被观察时的声音
-  end-peek: BLOCK_NOTE_BLOCK_BASS
-  # 冷却中的声音
-  cooldown: ENTITY_VILLAGER_NO
-
-# 消息配置
+# 消息设置
 messages:
-  zh_CN:
-    command-player-only: "&b&l[ICT] &f>> &d这个魔法只能由玩家施展哦~"
-    no-permission: "&b&l[ICT] &f>> &d抱歉，你还没有获得使用这个魔法的权限呢~"
-    usage: "&b&l[ICT] &f>> &d施法指南：\n&d➤ &f/peek <玩家名> &7观察指定玩家\n&d➤ &f/peek exit &7退出观察模式\n&d➤ &f/peek stats &7查看观察统计\n&d➤ &f/peek privacy &7切换私人模式\n&d➤ &f/peek accept &7接受观察请求\n&d➤ &f/peek deny &7拒绝观察请求"
-    already-peeking: "&b&l[ICT] &f>> &d你已经在观察别人了呢，输入 &f/peek exit &d解除魔法吧~"
-    player-not-found: "&b&l[ICT] &f>> &d咦？找不到玩家 &f{player} &d呢，是不是拼错名字啦？"
-    cannot-peek-self: "&b&l[ICT] &f>> &d自己观察自己？这可不行呢，试试观察别人吧！"
-    peek-start: "&b&l[ICT] &f>> &d✨ 施法成功！正在观察 &f{player}&d，记得用 &f/peek exit &d解除魔法哦~"
-    not-peeking: "&b&l[ICT] &f>> &d你现在没有施展任何观察魔法呢~"
-    peek-end: "&b&l[ICT] &f>> &d✨ 魔法消散了，已经回到自己的视角啦~"
-    target-offline: "&b&l[ICT] &f>> &d糟糕！目标玩家下线了，魔法自动解除啦~"
-    time-expired: "&b&l[ICT] &f>> &d时间到啦！魔法效果已经消失了呢~"
-    being-peeked: "&b&l[ICT] &f>> &d✨ 魔法提醒：&f{player} &d正在通过魔法观察你哦~"
-    action-bar: "&d✨ 当前有 &f{count} &d位魔法师在观察你呢~"
-    cooldown-peek: "&b&l[ICT] &f>> &d魔力还在恢复中，再等 &f{time} &d秒就能再次施法啦~"
-    stats-self: "&b&l[ICT] &f>> &d✨ 你的魔法记录：\n&d➤ 施法次数：&f{peek_count} &d次\n&d➤ 被观察次数：&f{peeked_count} &d次\n&d➤ 总施法时长：&f{peek_duration} &d分钟"
-    target-no-permission: "&b&l[ICT] &f>> &d这位玩家开启了防窥魔法护盾，暂时无法观察呢~"
-    command-error: "&b&l[ICT] &f>> &c糟糕！魔法出现了意外，快去找管理员帮忙吧！"
-    teleport-failed: "&b&l[ICT] &f>> &c哎呀！返回原位置时出了点小问题，重新试试看吧~"
-    stats-disabled: "&b&l[ICT] &f>> &c魔法记录功能现在处于休眠状态哦~"
-    too-many-observers: "&b&l[ICT] &f>> &d这位玩家已经被太多魔法师关注啦，等会儿再来吧~"
-    peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
-    peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
-    different-dimension: "&b&l[ICT] &f>> &d魔法似乎无法跨越维度的界限呢~"
-    range-exceeded: "&b&l[ICT] &f>> &d你离目标太远了，观察魔法已经自动解除~"
-    privacy-mode-enabled: "&b&l[ICT] &f>> &d私人模式已 &a&l启用"
-    privacy-mode-disabled: "&b&l[ICT] &f>> &d私人模式已 &c&l禁用"
-    peek-request: "&b&l[ICT] &f>> &d玩家 &f{player} &d请求观察你"
-    request-already-pending: "&b&l[ICT] &f>> &c该玩家已有一个待处理的请求"
-    request-timeout: "&b&l[ICT] &f>> &c请求已超时"
-    request-timeout-target: "&b&l[ICT] &f>> &c观察请求已超时"
-    request-denied: "&b&l[ICT] &f>> &c对方拒绝了你的观察请求"
-    no-pending-request: "&b&l[ICT] &f>> &c没有待处理的观察请求"
-    request-expired: "&b&l[ICT] &f>> &c该请求已过期"
-    request-sent: "&b&l[ICT] &f>> &d已成功向玩家 &f{player} &d发送观察请求"
-    target-is-peeking: "&b&l[ICT] &f>> &c该玩家正在观察其他玩家，无法被观察"
-
-# 调试模式设置
-debug: false
-
-# 性能设置
-performance:
-  async-save: true    # 是否异步保存统计数据
-  save-interval: 600  # 统计数据保存间隔（秒）
-
-# 功能限制
-limits:
-  max-peek-distance: 50.0  # 最大观察距离（格数）
-
-privacy:
-  request-timeout: 30  # 请求超时时间(秒)
-  cooldown:
-    enabled: true
-    duration: 120  # 拒绝或超时后的冷却时间(秒)
-  sounds:
-    request: BLOCK_NOTE_BLOCK_PLING  # 收到请求时的声音
-    accept: ENTITY_PLAYER_LEVELUP    # 请求被接受时的声音
-    deny: ENTITY_VILLAGER_NO         # 请求被拒绝时的声音
+  prefix: "&7[&bPeek&7] "
+  peek-start: "&a你开始观察 &e{player}"
+  peek-end: "&a你结束了观察"
+  being-peeked: "&e{player} &a正在观察你"
+  peek-end-target: "&e{player} &a结束了对你的观察"
+  already-peeking: "&c你已经在观察其他玩家了"
+  range-exceeded: "&c你离目标太远了，观察已结束"
+  teleport-failed: "&c传送失败"
+  privacy-mode-enabled: "&a隐私模式已启用"
+  privacy-mode-disabled: "&a隐私模式已禁用"
+  peek-request: "&e{player} &a请求观察你 &7(/peek accept 接受, /peek deny 拒绝)"
+  request-sent: "&a已向 &e{player} &a发送观察请求"
+  request-timeout: "&c请求已超时"
+  request-timeout-target: "&c观察请求已超时"
+  request-denied: "&c对方拒绝了你的请求"
+  request-already-pending: "&c你已经有一个待处理的请求了"
+  request-cooldown: "&c你需要等待 &e{time} &c秒才能再次发送请求"
+  no-pending-request: "&c没有待处理的请求"
+  request-expired: "&c请求已过期"
+  stats-disabled: "&c统计功能已禁用"
+  stats-self: "&a你的观察统计:\n&7观察次数: &e{peek_count}\n&7被观察次数: &e{peeked_count}\n&7总观察时长: &e{peek_duration} &7分钟"

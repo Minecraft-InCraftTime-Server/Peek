@@ -1,26 +1,25 @@
-package ict.minesunshineone.peek;
+package ict.minesunshineone.peek.util;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 
-/**
- * 消息管理类 负责从配置文件加载和管理插件的所有消息
- */
+import ict.minesunshineone.peek.PeekPlugin;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+
 public class Messages {
 
-    private final Map<String, String> messages = new HashMap<>();  // 存储所有消息
     private final PeekPlugin plugin;
+    private final Map<String, String> messages = new HashMap<>();
 
     public Messages(PeekPlugin plugin) {
         this.plugin = plugin;
         loadMessages();
     }
 
-    /**
-     * 从配置文件加载消息 支持多语言，默认使用中文
-     */
     private void loadMessages() {
         FileConfiguration config = plugin.getConfig();
         String language = config.getString("language", "zh_CN");
@@ -37,23 +36,6 @@ public class Messages {
         }
     }
 
-    /**
-     * 获取指定键的消息
-     *
-     * @param key 消息的键
-     * @return 对应的消息，如果不存在则返回错误提示
-     */
-    public String get(String key) {
-        return messages.getOrDefault(key, "Missing message: " + key);
-    }
-
-    /**
-     * 获取带有占位符替换的消息
-     *
-     * @param key 消息的键
-     * @param replacements 替换参数，格式为: 占位符,值,占位符,值...
-     * @return 替换后的消息
-     */
     public String get(String key, String... replacements) {
         String message = messages.getOrDefault(key, "Missing message: " + key);
         for (int i = 0; i < replacements.length; i += 2) {
@@ -61,8 +43,27 @@ public class Messages {
                 message = message.replace("{" + replacements[i] + "}", replacements[i + 1]);
             }
         }
-        return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand().serialize(
-                net.kyori.adventure.text.Component.text(message)
-        );
+        return message;
+    }
+
+    public void send(CommandSender sender, String key, String... replacements) {
+        String message = get(key, replacements);
+        if (message == null) {
+            return;
+        }
+
+        if (sender instanceof Player) {
+            ((Player) sender).sendMessage(LegacyComponentSerializer.legacyAmpersand().deserialize(message));
+        } else {
+            sender.sendMessage(message);
+        }
+    }
+
+    public void sendError(CommandSender sender, String key, Throwable error) {
+        send(sender, key);
+        if (plugin.getConfig().getBoolean("debug", false)) {
+            plugin.getLogger().warning(String.format("Error: %s - %s",
+                    key, error.getMessage()));
+        }
     }
 }
