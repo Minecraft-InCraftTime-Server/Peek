@@ -23,5 +23,8 @@ permissions:
   peek.nocooldown:
     description: Bypass cooldown
     default: op
+  peek.stats:
+    description: Allows viewing peek statistics
+    default: op
 
 softdepend: [PlaceholderAPI] 

@@ -1,15 +1,17 @@
 package ict.minesunshineone.peek.command;
 
-import ict.minesunshineone.peek.PeekPlugin;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+
+import ict.minesunshineone.peek.PeekPlugin;
 
 public class PeekCommand implements CommandExecutor, TabCompleter {
 

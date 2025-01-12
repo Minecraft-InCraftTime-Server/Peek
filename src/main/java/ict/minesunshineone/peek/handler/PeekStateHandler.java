@@ -18,6 +18,7 @@ public class PeekStateHandler {
     private final PeekPlugin plugin;
     private final Map<Player, PeekData> activePeeks = new HashMap<>();
     private final Map<Player, ScheduledTask> rangeCheckers = new HashMap<>();
+    private final Object rangeCheckersLock = new Object();
     private final double maxPeekDistance;
 
     public PeekStateHandler(PeekPlugin plugin) {
@@ -59,9 +60,6 @@ public class PeekStateHandler {
 
         // 播放声音
         playSound(target, "start-peek");
-
-        // 启动距离检查器
-        startRangeChecker(peeker, target);
     }
 
     public void endPeek(Player peeker, boolean shouldRestore) {
@@ -90,11 +88,12 @@ public class PeekStateHandler {
             // 设置冷却
             plugin.getCooldownManager().setCooldown(peeker);
 
+            // 停止距离检查器
+            stopRangeChecker(peeker);
+
             if (shouldRestore && peeker.isOnline()) {
                 restorePlayerState(peeker, data);
             }
-
-            activePeeks.remove(peeker);
 
             if (shouldRestore) {
                 plugin.getStateManager().clearPlayerState(peeker);
@@ -106,16 +105,12 @@ public class PeekStateHandler {
             }
             if (target != null && target.isOnline()) {
                 plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
-            }
-
-            // 播放声音
-            if (target != null && target.isOnline()) {
                 playSound(target, "end-peek");
             }
-        }
 
-        // 停止距离检查器
-        stopRangeChecker(peeker);
+            // 最后才移除活动peek
+            activePeeks.remove(peeker);
+        }
     }
 
     public void endPeek(Player peeker) {
@@ -125,16 +120,23 @@ public class PeekStateHandler {
     private void teleportAndSetGameMode(Player peeker, Player target) {
         // 先切换游戏模式
         plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
-            peeker.setGameMode(GameMode.SPECTATOR);
-            plugin.getMessages().send(peeker, "peek-mode-spectator");
+            try {
+                peeker.setGameMode(GameMode.SPECTATOR);
 
-            // 切换完成后再传送
-            peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
-                if (!success) {
-                    plugin.getMessages().send(peeker, "teleport-failed");
-                    endPeek(peeker);
-                }
-            });
+                // 切换完成后再传送
+                peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
+                    if (!success) {
+                        plugin.getMessages().send(peeker, "teleport-failed");
+                        endPeek(peeker);
+                    } else {
+                        // 传送成功后再启动距离检查器
+                        startRangeChecker(peeker, target);
+                    }
+                });
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to change gamemode for " + peeker.getName());
+                endPeek(peeker);
+            }
         });
     }
 
@@ -194,48 +196,57 @@ public class PeekStateHandler {
     }
 
     private void startRangeChecker(Player peeker, Player target) {
-        ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                target.getLocation(),
-                scheduledTask -> {
-                    if (!peeker.isOnline() || !target.isOnline()) {
-                        endPeek(peeker);
-                        return;
-                    }
+        synchronized (rangeCheckersLock) {
+            // 先停止已有的检查器（如果有的话）
+            stopRangeChecker(peeker);
 
-                    try {
-                        // 如果在同一个世界才检查距离
-                        if (peeker.getWorld().equals(target.getWorld())) {
-                            double distance = peeker.getLocation().distance(target.getLocation());
-                            if (distance > maxPeekDistance) {
-                                plugin.getMessages().send(peeker, "range-exceeded");
-                                endPeek(peeker);
-                            }
-                        } // 不同世界时自动跟随传送
-                        else {
-                            teleportAndSetGameMode(peeker, target);
+            ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
+                    target.getLocation(), // 使用target的位置而不是peeker的位置
+                    scheduledTask -> {
+                        if (!peeker.isOnline() || !target.isOnline()) {
+                            endPeek(peeker);
+                            return;
                         }
-                    } catch (Exception e) {
-                        // 只处理其他异常
-                        endPeek(peeker);
-                    }
-                },
-                1L, 100L);
 
-        rangeCheckers.put(peeker, task);
+                        try {
+                            // 如果在同一个世界才检查距离
+                            if (peeker.getWorld().equals(target.getWorld())) {
+                                double distance = peeker.getLocation().distance(target.getLocation());
+                                if (distance > maxPeekDistance) {
+                                    plugin.getMessages().send(peeker, "range-exceeded");
+                                    endPeek(peeker);
+                                }
+                            } // 不同世界时自动跟随传送
+                            else {
+                                teleportAndSetGameMode(peeker, target);
+                            }
+                        } catch (Exception e) {
+                            plugin.getLogger().warning("Error in range checker: " + e.getMessage());
+                            endPeek(peeker);
+                        }
+                    },
+                    1L, 100L);
+
+            rangeCheckers.put(peeker, task);
+        }
     }
 
     public void stopRangeChecker(Player peeker) {
-        ScheduledTask task = rangeCheckers.remove(peeker);
-        if (task != null) {
-            task.cancel();
+        synchronized (rangeCheckersLock) {
+            ScheduledTask task = rangeCheckers.remove(peeker);
+            if (task != null) {
+                task.cancel();
+            }
         }
     }
 
     public void cleanup() {
-        new HashMap<>(rangeCheckers).forEach((peeker, task) -> {
-            task.cancel();
-            rangeCheckers.remove(peeker);
-        });
+        synchronized (rangeCheckersLock) {
+            new HashMap<>(rangeCheckers).forEach((peeker, task) -> {
+                task.cancel();
+                rangeCheckers.remove(peeker);
+            });
+        }
     }
 
     public void removeActivePeek(Player player) {

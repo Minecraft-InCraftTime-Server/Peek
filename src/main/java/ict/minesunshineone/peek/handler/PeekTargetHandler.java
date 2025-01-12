@@ -1,7 +1,8 @@
 package ict.minesunshineone.peek.handler;
 
-import ict.minesunshineone.peek.PeekPlugin;
 import org.bukkit.entity.Player;
+
+import ict.minesunshineone.peek.PeekPlugin;
 
 public class PeekTargetHandler {
 
