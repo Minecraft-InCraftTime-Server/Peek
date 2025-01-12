@@ -61,6 +61,8 @@ public class PeekStateHandler {
 
         // 播放声音
         playSound(target, "start-peek");
+
+        updateActionBar(target);
     }
 
     public void endPeek(Player peeker, boolean shouldRestore) {
@@ -111,6 +113,11 @@ public class PeekStateHandler {
 
             // 最后才移除活动peek
             activePeeks.remove(peeker.getUniqueId());
+
+            // 更新目标玩家的actionbar
+            if (target != null && target.isOnline()) {
+                updateActionBar(target);
+            }
         }
     }
 
@@ -253,5 +260,19 @@ public class PeekStateHandler {
 
     public void removeActivePeek(Player player) {
         activePeeks.remove(player.getUniqueId());
+    }
+
+    public long getPeekerCount(UUID targetUUID) {
+        return activePeeks.values().stream()
+                .filter(data -> data.getTargetUUID().equals(targetUUID))
+                .count();
+    }
+
+    public void updateActionBar(Player target) {
+        long peekerCount = getPeekerCount(target.getUniqueId());
+        if (peekerCount > 0) {
+            plugin.getMessages().sendActionBar(target, "being-peeked-actionbar",
+                    "count", String.valueOf(peekerCount));
+        }
     }
 }

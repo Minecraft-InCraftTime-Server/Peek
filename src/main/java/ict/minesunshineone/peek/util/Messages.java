@@ -82,4 +82,20 @@ public class Messages {
     public String get(String key) {
         return messages.getString("messages." + key);
     }
+
+    public void sendActionBar(Player player, String key, String... placeholders) {
+        String message = messages.getString("messages." + key);
+        if (message == null) {
+            return;
+        }
+
+        // 替换占位符
+        for (int i = 0; i < placeholders.length; i += 2) {
+            if (i + 1 < placeholders.length) {
+                message = message.replace("{" + placeholders[i] + "}", placeholders[i + 1]);
+            }
+        }
+
+        player.sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize(message));
+    }
 }
