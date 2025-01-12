@@ -7,6 +7,8 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+
 /**
  * Peek插件主类 用于管理插件的生命周期和配置
  */
@@ -71,6 +73,10 @@ public class PeekPlugin extends JavaPlugin {
 
         // 结束所有玩家的观察状态
         if (peekCommand != null) {
+            // 清理所有计时器
+            peekCommand.getPeekTimers().values().forEach(ScheduledTask::cancel);
+            peekCommand.getPeekTimers().clear();
+
             new HashMap<>(peekCommand.getPeekingPlayers()).forEach((player, data) -> {
                 if (player.isOnline()) {
                     // 保存状态

@@ -16,6 +16,8 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+
 /**
  * 处理/peek命令的执行器类
  */
@@ -23,6 +25,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
     private final PeekPlugin plugin;
     private final Map<Player, PeekData> peekingPlayers = new HashMap<>();  // 存储正在观察中的玩家数据
+    private final Map<Player, ScheduledTask> peekTimers = new HashMap<>();
 
     public PeekCommand(PeekPlugin plugin) {
         if (plugin == null) {
@@ -201,11 +204,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         // 设置最大观察时间定时器
         if (plugin.getMaxPeekDuration() > 0) {
             long durationInMillis = plugin.getMaxPeekDuration() * 1000L;
-            if (plugin.isDebugEnabled()) {
-                plugin.getLogger().info(String.format("设置观察时间限制: %d秒 (%d毫秒)",
-                        plugin.getMaxPeekDuration(), durationInMillis));
-            }
-            plugin.getServer().getAsyncScheduler().runDelayed(plugin, scheduledTask -> {
+            ScheduledTask task = plugin.getServer().getAsyncScheduler().runDelayed(plugin, scheduledTask -> {
                 if (peekingPlayers.containsKey(player)) {
                     plugin.getServer().getRegionScheduler().execute(plugin,
                             player.getLocation(), () -> {
@@ -214,6 +213,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                     });
                 }
             }, durationInMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
+            peekTimers.put(player, task);
         }
 
         return true;
@@ -274,6 +274,8 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
 
         // 在退出时设置冷却
         plugin.getCooldownManager().setCooldownAfterPeek(player);
+
+        cancelPeekTimer(player);
 
         return true;
     }
@@ -430,5 +432,16 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         peekingPlayers.remove(player);
         sendMessage(player, "teleport-failed");
         plugin.getLogger().warning(String.format("玩家 %s 传送失败", player.getName()));
+    }
+
+    private void cancelPeekTimer(Player player) {
+        ScheduledTask task = peekTimers.remove(player);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    public Map<Player, ScheduledTask> getPeekTimers() {
+        return peekTimers;
     }
 }

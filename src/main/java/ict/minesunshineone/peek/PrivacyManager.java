@@ -174,6 +174,9 @@ public class PrivacyManager {
             plugin.getCooldownManager().setCooldownAfterPeek(request.requester());
             playSound(target, "deny");
             playSound(request.requester(), "deny");
+        } else {
+            target.sendMessage(LegacyComponentSerializer.legacyAmpersand()
+                    .deserialize(plugin.getMessages().get("no-pending-request")));
         }
     }
 

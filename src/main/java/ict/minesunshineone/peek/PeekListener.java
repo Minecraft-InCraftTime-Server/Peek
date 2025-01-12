@@ -8,8 +8,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-
 /**
  * 处理与观察模式相关的事件监听器
  */
@@ -42,28 +40,6 @@ public class PeekListener implements Listener {
 
     private void handlePlayerQuit(Player player) {
         long quitTime = System.currentTimeMillis();
-
-        // 如果退出的玩家正在被观察，强制所有观察者退出
-        peekCommand.getPeekingPlayers().entrySet().removeIf(entry -> {
-            if (entry.getValue().getTargetPlayer().equals(player)) {
-                Player peeker = entry.getKey();
-                // 记录观察时长
-                if (plugin.getStatistics() != null) {
-                    long duration = (quitTime - entry.getValue().getStartTime()) / 1000;
-                    plugin.getStatistics().recordPeekDuration(peeker, duration);
-                }
-
-                // 在正确的区域执行传送
-                plugin.getServer().getRegionScheduler().execute(plugin,
-                        peeker.getLocation(), () -> {
-                    peekCommand.handleExit(peeker);
-                    peeker.sendMessage(LegacyComponentSerializer.legacyAmpersand()
-                            .deserialize(plugin.getMessages().get("target-offline")));
-                });
-                return true;
-            }
-            return false;
-        });
 
         // 如果退出的玩家正在观察别人，强制退出观察模式
         if (peekCommand.getPeekingPlayers().containsKey(player)) {

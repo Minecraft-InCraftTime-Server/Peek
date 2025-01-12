@@ -35,39 +35,23 @@ public class PeekRangeChecker {
                 Player peeker = entry.getKey();
                 Player target = entry.getValue().getTargetPlayer();
 
-                if (peeker == null || target == null || !peeker.isOnline() || !target.isOnline()
-                        || entry.getValue().isExiting()) {
+                if (peeker == null || !peeker.isOnline() || entry.getValue().isExiting()) {
                     continue;
                 }
 
-                try {
-                    if (!peeker.getWorld().equals(target.getWorld())) {
-                        continue;
-                    }
+                if (target == null || !target.isOnline()
+                        || !peeker.getWorld().equals(target.getWorld())
+                        || peeker.getLocation().distanceSquared(target.getLocation()) > maxDistanceSquared) {
 
-                    if (peeker.getLocation().distanceSquared(target.getLocation()) > maxDistanceSquared) {
-                        handleExceedRange(peeker);
-                    }
-                } catch (Exception e) {
-                    if (plugin.isDebugEnabled()) {
-                        plugin.getLogger().warning(String.format("检查玩家距离时发生错误: %s", e.getMessage()));
-                    }
+                    plugin.getServer().getRegionScheduler().execute(plugin,
+                            peeker.getLocation(), () -> {
+                        peekCommand.handleExit(peeker);
+                        peeker.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                                .legacyAmpersand().deserialize(plugin.getMessages().get("range-exceeded")));
+                    });
                 }
             }
         }, CHECK_INTERVAL, CHECK_INTERVAL);
-    }
-
-    private void handleExceedRange(Player peeker) {
-        if (!peeker.isOnline()) {
-            return;
-        }
-
-        plugin.getServer().getRegionScheduler().execute(plugin, peeker.getLocation(), () -> {
-            if (peekCommand.getPeekingPlayers().containsKey(peeker)) {
-                peekCommand.handleExit(peeker);
-                peekCommand.sendMessage(peeker, "range-exceeded");
-            }
-        });
     }
 
     public void shutdown() {

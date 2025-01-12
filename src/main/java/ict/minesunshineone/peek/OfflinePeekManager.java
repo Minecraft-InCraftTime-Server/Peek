@@ -120,27 +120,42 @@ public class OfflinePeekManager {
 
     private void handleRestoreAndCleanup(Player player, GameMode gameMode, Location location, long startTime) {
         plugin.getServer().getRegionScheduler().execute(plugin, player.getLocation(), () -> {
-            player.setGameMode(gameMode);
-            player.teleportAsync(location).thenAccept(result -> {
-                if (result) {
-                    if (plugin.getStatistics() != null) {
-                        long duration = (System.currentTimeMillis() - startTime) / 1000;
-                        plugin.getStatistics().recordPeekDuration(player, duration);
+            if (!player.getWorld().equals(location.getWorld())) {
+                // 跨维度返回，先传送再切换模式
+                player.teleportAsync(location).thenAccept(result -> {
+                    if (result) {
+                        player.setGameMode(gameMode);
+                        handleRestoreSuccess(player, startTime);
                     }
-                    player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
-                            .legacyAmpersand().deserialize(plugin.getMessages().get("peek-end-offline")));
-
-                    // 删除数据
-                    String uuidString = player.getUniqueId().toString();
-                    pendingPeeks.set(uuidString, null);
-                    try {
-                        pendingPeeks.save(pendingPeeksFile);
-                    } catch (IOException e) {
-                        plugin.getLogger().warning(String.format("无法删除已恢复的观察状态: %s", e.getMessage()));
+                });
+            } else {
+                // 同维度返回
+                player.setGameMode(gameMode);
+                player.teleportAsync(location).thenAccept(result -> {
+                    if (result) {
+                        handleRestoreSuccess(player, startTime);
                     }
-                }
-            });
+                });
+            }
         });
+    }
+
+    private void handleRestoreSuccess(Player player, long startTime) {
+        if (plugin.getStatistics() != null) {
+            long duration = (System.currentTimeMillis() - startTime) / 1000;
+            plugin.getStatistics().recordPeekDuration(player, duration);
+        }
+        player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacyAmpersand()
+                .deserialize(plugin.getMessages().get("peek-end-offline")));
+
+        // 删除数据
+        String uuidString = player.getUniqueId().toString();
+        pendingPeeks.set(uuidString, null);
+        try {
+            pendingPeeks.save(pendingPeeksFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning(String.format("无法删除已恢复的观察状态: %s", e.getMessage()));
+        }
     }
 
     private void validateAndCleanData() {
