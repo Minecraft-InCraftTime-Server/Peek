@@ -71,8 +71,6 @@ public class PeekPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (stateHandler != null) {
-            stateHandler.cleanup();
-            // 直接清理，不要使用调度器
             new HashMap<>(stateHandler.getActivePeeks()).forEach((uuid, data) -> {
                 Player player = getServer().getPlayer(uuid);
                 if (player != null && player.isOnline()) {
