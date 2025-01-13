@@ -1,12 +1,17 @@
 package ict.minesunshineone.peek.manager;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.bukkit.Sound;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
@@ -23,11 +28,41 @@ public class PrivacyManager {
     private final boolean cooldownEnabled;
     private final int cooldownDuration;
 
+    private final File privacyFile;
+    private final YamlConfiguration privacyConfig;
+
     public PrivacyManager(PeekPlugin plugin) {
         this.plugin = plugin;
         this.requestTimeout = plugin.getConfig().getInt("privacy.request-timeout", 30);
         this.cooldownEnabled = plugin.getConfig().getBoolean("privacy.cooldown.enabled", true);
         this.cooldownDuration = plugin.getConfig().getInt("privacy.cooldown.duration", 120);
+        this.privacyFile = new File(plugin.getDataFolder(), "privacy.yml");
+        this.privacyConfig = YamlConfiguration.loadConfiguration(privacyFile);
+        loadPrivacyStates();
+    }
+
+    private void loadPrivacyStates() {
+        List<String> uuids = privacyConfig.getStringList("private_mode_players");
+        privateModeUsers.clear();
+        for (String uuid : uuids) {
+            try {
+                privateModeUsers.add(UUID.fromString(uuid));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning(String.format("无效的UUID格式: %s", uuid));
+            }
+        }
+    }
+
+    public void savePrivacyStates() {
+        List<String> uuids = privateModeUsers.stream()
+                .map(UUID::toString)
+                .collect(Collectors.toList());
+        privacyConfig.set("private_mode_players", uuids);
+        try {
+            privacyConfig.save(privacyFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning(String.format("无法保存私人模式状态: %s", e.getMessage()));
+        }
     }
 
     public boolean isPrivateMode(Player player) {
@@ -43,9 +78,21 @@ public class PrivacyManager {
             privateModeUsers.add(uuid);
             plugin.getMessages().send(player, "privacy-mode-enabled");
         }
+        savePrivacyStates();
     }
 
     public void sendPeekRequest(Player peeker, Player target) {
+        // 添加请求前的检查
+        if (!target.isOnline()) {
+            plugin.getMessages().send(peeker, "target-offline");
+            return;
+        }
+
+        if (plugin.getStateHandler().getActivePeeks().containsKey(target.getUniqueId())) {
+            plugin.getMessages().send(peeker, "target-is-peeking");
+            return;
+        }
+
         UUID peekerUuid = peeker.getUniqueId();
         UUID targetUuid = target.getUniqueId();
 

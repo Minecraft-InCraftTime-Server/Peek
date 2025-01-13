@@ -58,4 +58,7 @@ messages:
   error-invalid-gamemode: "  &c当前游戏模式下无法使用贴贴魔法呢~"
   error-plugin-disabled: "  &c贴贴系统正在休息，请稍后再来~"
   error-data-corrupted: "  &c啊哦！你的贴贴数据似乎出了点问题..."
-  being-peeked-actionbar: "&d当前有 &f{count} &d个玩家正在贴贴你" 
+  being-peeked-actionbar: "&d当前有 &f{count} &d个玩家正在贴贴你"
+  privacy-request-sent: "&d✨ 已向 &f{player} &d发送贴贴请求，等待回应中..."
+  privacy-request-received: "&d✨ &f{player} &d想要和你贴贴，输入 &f/peek accept &d接受，或 &f/peek deny &d拒绝"
+  privacy-request-expired: "&d贴贴请求已过期，需要重新发送哦~"

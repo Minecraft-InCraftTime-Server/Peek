@@ -83,6 +83,10 @@ public class PeekPlugin extends JavaPlugin {
             statisticsManager.saveStats();
         }
 
+        if (privacyManager != null) {
+            privacyManager.savePrivacyStates();
+        }
+
         getLogger().info("Peek插件已禁用！");
     }
 
