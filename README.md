@@ -1,54 +1,67 @@
-# Peek - 贴贴插件
+# Peek - 贴贴魔法插件 ✨
 
-一个有趣的 Minecraft 插件，让玩家可以以观察者模式查看其他玩家的视角。
+一个充满魔法的 Minecraft 插件，让玩家可以通过魔法之眼查看其他玩家的视角。
 
-## ✨ 特性
+## 🌟 魔法特性
 
-- 🎮 使用观察者模式查看其他玩家
-- 🔒 私人模式和请求系统
-- ⏱️ 可配置的冷却时间
-- 📊 详细的统计信息
-- 🌍 跨维度自动传送
-- 🎵 可自定义的音效提示
-- 🔄 自动状态保存和恢复
+- 🎯 观察者模式贴贴
+- 🔮 私人模式与请求系统
+- ⏳ 魔法冷却时间
+- 📊 详尽的施法记录
+- 🌍 跨维度传送
+- 🎵 自定义魔法音效
+- 💫 状态保存与恢复
 - 📈 PlaceholderAPI 变量支持
 
-## 🚀 快速开始
+## 📌 注意事项
 
-1. 下载最新版本的插件
-2. 放入服务器的 plugins 文件夹
-3. 重启服务器
-4. （可选）安装 PlaceholderAPI 以使用统计变量
+1. 需要 Paper/Folia 服务端
+2. 支持 Minecraft 1.20+
+3. 建议安装 PlaceholderAPI
+4. 私人模式需要玩家在线
+5. 跨维度传送可能受服务器设置影响
+6. 统计数据会定期自动保存
+7. 冷却时间可在配置中调整
+8. 支持自定义所有消息文本
+9. 支持自定义所有音效
+10. 统计变量需要安装 PlaceholderAPI 才能使用
 
-## 📝 命令
+## 🎮 快速开始
 
-- `/peek <玩家名>` - 观察指定玩家
-- `/peek exit` - 退出观察模式
-- `/peek stats` - 查看统计信息
-- `/peek privacy` - 切换私人模式
-- `/peek accept` - 接受观察请求
-- `/peek deny` - 拒绝观察请求
+1. 下载最新版本的Peek(插件)
+2. 放入你的魔法工坊(服务器)的 plugins 文件夹
+3. 重启服务器，让魔法生效
+4. (可选) 安装 PlaceholderAPI 以使用进阶魔法变量
 
-## 🔑 权限
+## 📜 魔法咒语(命令)
 
-- `peek.use` - 允许使用基础贴贴功能
-- `peek.bypass` - 允许绕过私人模式
-- `peek.nocooldown` - 允许绕过冷却时间
-- `peek.stats` - 允许查看统计信息
+- `/peek <玩家名>` - 施展贴贴魔法
+- `/peek exit` - 解除贴贴魔法
+- `/peek stats` - 查看魔法记录
+- `/peek privacy` - 切换私人魔法护盾
+- `/peek accept` - 接受贴贴请求
+- `/peek deny` - 拒绝贴贴请求
 
-## ⚙️ 配置
+## 🔑 魔法权限
 
-### config.yml
+- `peek.use` - 允许使用基础贴贴魔法
+- `peek.bypass` - 允许绕过私人魔法护盾
+- `peek.nocooldown` - 允许无视魔法冷却
+- `peek.stats` - 允许查看魔法记录
+
+## ⚙️ 魔法配置
+
+### 基础设置
 ```yaml
 # 调试模式
 debug: false
 
 # 限制设置
 limits:
-  max-peek-distance: 50.0  # 最大观察距离
+  max-peek-distance: 50.0  # 最大魔法距离
   cooldown:
-    enabled: true         # 是否启用观察冷却
-    duration: 90        # 观察冷却时间(秒)
+    enabled: true         # 是否启用魔法冷却
+    duration: 90        # 魔法冷却时间(秒)
 
 # 隐私设置
 privacy:
@@ -93,38 +106,56 @@ sounds:
    - 超出距离自动结束
    - 跨维度自动传送
 
-## 📌 注意事项
+## 🎯 技术特性
 
-1. 需要 Paper/Folia 服务端
-2. 支持 Minecraft 1.20+
-3. 建议安装 PlaceholderAPI
-4. 私人模式需要玩家在线
-5. 跨维度传送可能受服务器设置影响
-6. 统计数据会定期自动保存
-7. 冷却时间可在配置中调整
-8. 支持自定义所有消息文本
-9. 支持自定义所有音效
-10. 统计变量需要安装 PlaceholderAPI 才能使用
+1. **Folia 支持**
+   - 完整支持 Folia 多线程系统
+   - 优化的区域调度器使用
+   - 安全的跨线程操作
+
+2. **状态管理**
+   - 自动保存玩家状态
+   - 安全的状态恢复机制
+   - 跨服务器重启保护
+
+3. **性能优化**
+   - 异步数据处理
+   - 内存优化管理
+   - 自动清理系统
+
+## 🛠️ 开发要求
+
+- Java 21+
+- Paper/Folia 1.20+
+- PlaceholderAPI (可选)
+
+## 📦 构建工具
+
+- Maven
+- Adventure API
+- Folia API
+- PlaceholderAPI
 
 ## 🔄 更新日志
 
-### v2.0
-- ✨ 优化了跨维度传送逻辑
+### v2.2
+- ✨ 优化了 Folia 支持
 - 🔒 改进了状态保存机制
 - 🎯 优化了距离检查逻辑
-- 🔧 修复了已知问题
+- 🎵 新增了更多音效选项
 
-## 🛠️ 开发计划
+## 🐛 问题反馈
 
-- [x] 基础贴贴功能
-- [x] 私人模式系统
-- [x] 统计系统
-- [x] 状态保存
-- [x] PlaceholderAPI 扩展支持
-- [x] 跨维度支持
-- [x] 距离限制
-- [x] 音效系统
+如果您在使用过程中遇到任何问题，欢迎通过以下方式反馈：
+
+1. 在 [GitHub Issues](https://github.com/MineSunshineOne/Peek/issues) 提交问题
 
 ## 📄 开源协议
 
-本项目采用 MIT 协议开源。
+本项目采用 [MIT](LICENSE) 协议开源。
+
+## 🙏 鸣谢
+
+- [Paper](https://papermc.io/) - 高性能 Minecraft 服务端
+- [Folia](https://github.com/PaperMC/Folia) - 多线程优化服务端
+- [MiniMessage](https://docs.adventure.kyori.net/minimessage.html) - 文本格式化库
