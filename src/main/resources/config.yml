@@ -1,70 +1,38 @@
-# Peek插件配置文件
+# 调试模式
+debug: false
 
-# 消息语言 (en_US 或 zh_CN)
-language: zh_CN
+# 限制设置
+limits:
+  max-peek-distance: 50.0  # 最大观察距离
+  cooldown:
+    enabled: true         # 是否启用观察冷却
+    duration: 90        # 观察冷却时间(秒)
 
-# 最大观察时间（分钟，0表示无限制）
-max-peek-duration: 5
+# 隐私设置
+privacy:
+  request-timeout: 30      # 请求超时时间(秒)
+  cooldown:
+    enabled: true         # 是否启用请求冷却
+    duration: 90        # 冷却时间(秒)
+  sounds:
+    request: BLOCK_NOTE_BLOCK_PLING    # 请求音效
+    accept: ENTITY_PLAYER_LEVELUP      # 接受音效
+    deny: BLOCK_ANVIL_LAND            # 拒绝音效
 
-# 冷却时间设置（秒）
-cooldowns:
-  peek: 30      # 观察指令冷却时间
+# 声音设置
+sounds:
+  start-peek: ENTITY_ENDERMAN_TELEPORT  # 开始观察音效
+  end-peek: ENTITY_ENDERMAN_TELEPORT    # 结束观察音效
 
 # 统计设置
 statistics:
   enabled: true           # 是否启用统计
-  save-interval: 600      # 统计保存间隔（秒）
+  save-interval: 600      # 自动保存间隔(秒)
 
-# 声音提示设置
-sounds:
-  # 开始被观察时的声音
-  start-peek: BLOCK_NOTE_BLOCK_PLING
-  # 结束被观察时的声音
-  end-peek: BLOCK_NOTE_BLOCK_BASS
-  # 冷却中的声音
-  cooldown: ENTITY_VILLAGER_NO
+# 文件设置
+files:
+  stats: "stats.yml"      # 统计文件名
+  states: "states.yml"    # 状态文件名
 
-# 消息配置
-messages:
-  zh_CN:
-    command-player-only: "&b&l[ICT] &f>> &d这个魔法只能由玩家施展哦~"
-    no-permission: "&b&l[ICT] &f>> &d抱歉，你还没有获得使用这个魔法的权限呢~"
-    usage: "&b&l[ICT] &f>> &d施法指南：&f/peek <玩家名> &7或 &f/peek exit &7✨"
-    already-peeking: "&b&l[ICT] &f>> &d你已经在观察别人了呢，输入 &f/peek exit &d解除魔法吧~"
-    player-not-found: "&b&l[ICT] &f>> &d咦？找不到玩家 &f{player} &d呢，是不是拼错名字啦？"
-    cannot-peek-self: "&b&l[ICT] &f>> &d自己观察自己？这可不行呢，试试观察别人吧！"
-    peek-start: "&b&l[ICT] &f>> &d✨ 施法成功！正在观察 &f{player}&d，记得用 &f/peek exit &d解除魔法哦~"
-    not-peeking: "&b&l[ICT] &f>> &d你现在没有施展任何观察魔法呢~"
-    peek-end: "&b&l[ICT] &f>> &d✨ 魔法消散了，已经回到自己的视角啦~"
-    target-offline: "&b&l[ICT] &f>> &d糟糕！目标玩家下线了，魔法自动解除啦~"
-    time-expired: "&b&l[ICT] &f>> &d时间到啦！魔法效果已经消失了呢~"
-    being-peeked: "&b&l[ICT] &f>> &d✨ 魔法提醒：&f{player} &d正在通过魔法观察你哦~"
-    action-bar: "&d✨ 当前有 &f{count} &d位魔法师在观察你呢~"
-    cooldown-peek: "&b&l[ICT] &f>> &d魔力还在恢复中，再等 &f{time} &d秒就能再次施法啦~"
-    stats-self: "&b&l[ICT] &f>> &d✨ 你的魔法记录：\n&d➤ 施法次数：&f{peek_count} &d次\n&d➤ 被观察次数：&f{peeked_count} &d次\n&d➤ 总施法时长：&f{peek_duration} &d分钟"
-    target-no-permission: "&b&l[ICT] &f>> &d这位玩家开启了防窥魔法护盾，暂时无法观察呢~"
-    command-error: "&b&l[ICT] &f>> &c糟糕！魔法出现了意外，快去找管理员帮忙吧！"
-    teleport-failed: "&b&l[ICT] &f>> &c哎呀！返回原位置时出了点小问题，重新试试看吧~"
-    stats-disabled: "&b&l[ICT] &f>> &c魔法记录功能现在处于休眠状态哦~"
-    gamemode-force-exit: "&b&l[ICT] &f>> &c由于游戏模式改变，魔法效果被迫解除啦！"
-    too-many-observers: "&b&l[ICT] &f>> &d这位玩家已经被太多魔法师关注啦，等会儿再来吧~"
-    peek-end-target: "&b&l[ICT] &f>> &d✨ 魔法师 &f{player} &d结束了对你的观察~"
-    peek-end-offline: "&b&l[ICT] &f>> &d✨ 检测到你上次观察时意外断开连接，已经帮你恢复原来的状态啦~"
-    different-dimension: "&b&l[ICT] &f>> &d魔法似乎无法跨越维度的界限呢~"
-
-# 权限检查设置
-permissions:
-  check-target: true       # 是否检查目标玩家的权限
-  target-permission: peek.target  # 目标玩家需要的权限
-
-# 调试模式设置
-debug: false
-
-# 性能设置
-performance:
-  async-save: true    # 是否异步保存统计数据
-  save-interval: 600  # 统计数据保存间隔（秒）
-
-# 功能限制
-limits:
-  max-observers: 5    # 单个玩家最大观察者数量
+# 语言设置
+language: "zh_CN"  # 默认语言

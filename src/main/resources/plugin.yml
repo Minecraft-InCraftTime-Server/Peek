@@ -1,32 +1,30 @@
 name: Peek
-version: '1.0'
+version: '${project.version}'
 main: ict.minesunshineone.peek.PeekPlugin
 api-version: '1.20'
-author: MineSunshineOne
-description: 一个允许玩家临时观察其他玩家的插件
+authors: [MineSunshineOne]
+description: A plugin that allows players to peek at other players
+website: https://github.com/MineSunshineOne/Peek
 folia-supported: true
 
 commands:
   peek:
-    description: 观察其他玩家
-    usage: |-
-      使用 Adventure API 的 MiniMessage 格式:
-      <click:run_command:/peek><hover:show_text:'点击查看用法'>/peek</click>
-      <gray>/peek <玩家名></gray> - 观察指定玩家
-      <gray>/peek exit</gray> - 退出观察模式
-      <gray>/peek stats</gray> - 查看个人观察统计
-    permission: peek.use
-    permission-message: §c你没有权限使用此命令！
+    description: Main command for Peek plugin
+    usage: /peek <player>
+    aliases: [p]
 
 permissions:
   peek.use:
-    description: 允许使用peek命令
+    description: Allows using the peek command
+    default: op
+  peek.bypass:
+    description: Bypass privacy mode
     default: op
   peek.nocooldown:
-    description: 允许绕过冷却时间限制
+    description: Bypass cooldown
     default: op
   peek.stats:
-    description: 允许查看观察统计信息
-    default: true 
+    description: Allows viewing peek statistics
+    default: op
 
 softdepend: [PlaceholderAPI] 
