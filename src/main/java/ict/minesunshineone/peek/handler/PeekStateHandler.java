@@ -129,6 +129,11 @@ public class PeekStateHandler {
         // 先切换游戏模式
         plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
             try {
+                // 如果玩家在睡觉，先让他离开床
+                if (peeker.isSleeping()) {
+                    peeker.wakeup(false);
+                }
+
                 peeker.setGameMode(GameMode.SPECTATOR);
 
                 // 切换完成后再传送
@@ -150,9 +155,17 @@ public class PeekStateHandler {
 
     private void restorePlayerState(Player peeker, PeekData data) {
         plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), task -> {
+            // 如果玩家在睡觉，先让他离开床
+            if (peeker.isSleeping()) {
+                peeker.wakeup(false);
+            }
+
             peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
                 if (success) {
-                    peeker.setGameMode(data.getOriginalGameMode());
+                    // 传送成功后再改变游戏模式
+                    plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), modeTask -> {
+                        peeker.setGameMode(data.getOriginalGameMode());
+                    });
                 } else {
                     plugin.getLogger().warning(String.format(
                             "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
@@ -167,7 +180,10 @@ public class PeekStateHandler {
                         plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
                             peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
                                 if (spawnSuccess) {
-                                    peeker.setGameMode(data.getOriginalGameMode());
+                                    // 传送到重生点成功后再改变游戏模式
+                                    plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, modeTask -> {
+                                        peeker.setGameMode(data.getOriginalGameMode());
+                                    });
                                 } else {
                                     plugin.getLogger().severe(String.format(
                                             "无法将玩家 %s 传送到任何安全位置",
@@ -225,8 +241,9 @@ public class PeekStateHandler {
                                     plugin.getMessages().send(peeker, "range-exceeded");
                                     endPeek(peeker);
                                 }
-                            } // 不同世界时自动跟随传送
-                            else {
+                            } else {
+                                // 发送跨维度传送提示
+                                plugin.getMessages().send(peeker, "target-in-different-world");
                                 teleportAndSetGameMode(peeker, target);
                             }
                         } catch (Exception e) {

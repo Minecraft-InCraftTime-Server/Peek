@@ -284,4 +284,8 @@ public class PrivacyManager {
             plugin.getMessages().send(player, "request-expired");
         }
     }
+
+    public Map<UUID, Map<UUID, ScheduledTask>> getPendingRequests() {
+        return pendingRequests;
+    }
 }

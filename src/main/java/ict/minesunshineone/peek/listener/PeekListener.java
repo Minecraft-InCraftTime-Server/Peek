@@ -9,11 +9,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PeekListener implements Listener {
 
@@ -61,6 +63,8 @@ public class PeekListener implements Listener {
         // 检查是否有未恢复的状态
         PeekData savedState = plugin.getStateManager().getPlayerState(player);
         if (savedState != null) {
+            // 发送断线重连提示
+            plugin.getMessages().send(player, "peek-end-offline");
             // 恢复玩家状态
             plugin.getServer().getRegionScheduler().run(plugin,
                     savedState.getOriginalLocation(),
@@ -89,6 +93,16 @@ public class PeekListener implements Listener {
                                     }
                                 });
                     });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player player = event.getPlayer();
+        Map<UUID, ScheduledTask> requests = plugin.getPrivacyManager().getPendingRequests().get(player.getUniqueId());
+        if (requests != null && !requests.isEmpty()) {
+            plugin.getPrivacyManager().cancelAllRequests(player);
+            plugin.getMessages().send(player, "request-cancelled-death");
         }
     }
 }
