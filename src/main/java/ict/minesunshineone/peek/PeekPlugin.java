@@ -97,7 +97,6 @@ public class PeekPlugin extends JavaPlugin {
         // 检查并设置必要的配置项
         Map<String, Object> defaults = new HashMap<>();
         defaults.put("language", "zh_CN");
-        defaults.put("max-peek-duration", 5);
         defaults.put("cooldowns.peek", 60);
         defaults.put("statistics.enabled", true);
         defaults.put("statistics.save-interval", 600);

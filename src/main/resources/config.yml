@@ -4,16 +4,15 @@ debug: false
 # 限制设置
 limits:
   max-peek-distance: 50.0  # 最大观察距离
-  cooldown:
-    enabled: true         # 是否启用观察冷却
-    duration: 90        # 观察冷却时间(秒)
+cooldowns:
+  peek: 60 # 观察冷却时间(秒)
 
 # 隐私设置
 privacy:
   request-timeout: 30      # 请求超时时间(秒)
   cooldown:
     enabled: true         # 是否启用请求冷却
-    duration: 90        # 冷却时间(秒)
+    duration: 60        # 冷却时间(秒)
   sounds:
     request: BLOCK_NOTE_BLOCK_PLING    # 请求音效
     accept: ENTITY_PLAYER_LEVELUP      # 接受音效
