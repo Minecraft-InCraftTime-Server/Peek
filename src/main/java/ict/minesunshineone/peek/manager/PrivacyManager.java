@@ -156,7 +156,7 @@ public class PrivacyManager {
         return targetRequests != null && targetRequests.containsKey(peeker.getUniqueId());
     }
 
-    private boolean removePendingRequest(Player peeker, Player target) {
+    public boolean removePendingRequest(Player peeker, Player target) {
         Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(target.getUniqueId());
         if (targetRequests != null) {
             ScheduledTask task = targetRequests.remove(peeker.getUniqueId());

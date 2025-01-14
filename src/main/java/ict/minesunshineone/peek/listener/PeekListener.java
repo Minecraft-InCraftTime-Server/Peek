@@ -99,10 +99,22 @@ public class PeekListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
-        Map<UUID, ScheduledTask> requests = plugin.getPrivacyManager().getPendingRequests().get(player.getUniqueId());
-        if (requests != null && !requests.isEmpty()) {
-            plugin.getPrivacyManager().cancelAllRequests(player);
-            plugin.getMessages().send(player, "request-cancelled-death");
+
+        // 如果玩家死亡时有发出的请求，取消所有请求
+        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry
+                : new HashMap<>(plugin.getPrivacyManager().getPendingRequests()).entrySet()) {
+            Map<UUID, ScheduledTask> requests = entry.getValue();
+            if (requests.containsKey(player.getUniqueId())) {
+                // 取消该玩家发出的请求
+                Player target = plugin.getServer().getPlayer(entry.getKey());
+                plugin.getPrivacyManager().removePendingRequest(player, target);
+
+                // 发送消息给双方
+                plugin.getMessages().send(player, "request-cancelled-death");
+                if (target != null && target.isOnline()) {
+                    plugin.getMessages().send(target, "request-cancelled-death-target");
+                }
+            }
         }
     }
 }

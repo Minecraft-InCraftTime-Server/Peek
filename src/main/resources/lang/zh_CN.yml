@@ -39,3 +39,5 @@ messages:
   stats-peek-record: "  &d→ 最长单次贴贴时长：&f{longest_duration} &d分钟"
   stats-target-record: "  &d→ 最常贴贴的玩家：&f{most_peeked_player}"
   being-peeked-actionbar: "&d当前有 &f{count} &d个玩家正在贴贴你"
+  request-cancelled-death: "  &d你死亡了，贴贴请求已自动取消~"
+  request-cancelled-death-target: "  &d对方死亡了，贴贴请求已自动取消~"
