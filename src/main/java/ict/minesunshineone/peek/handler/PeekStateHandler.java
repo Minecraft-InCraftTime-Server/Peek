@@ -160,6 +160,11 @@ public class PeekStateHandler {
                 peeker.wakeup(false);
             }
 
+            // 如果玩家在附身状态，先退出附身
+            if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
+                peeker.setSpectatorTarget(null);
+            }
+
             peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
                 if (success) {
                     // 传送成功后再改变游戏模式
