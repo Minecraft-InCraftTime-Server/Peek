@@ -98,14 +98,14 @@ public class PeekPlugin extends JavaPlugin {
         Map<String, Object> defaults = new HashMap<>();
         defaults.put("language", "zh_CN");
         defaults.put("max-peek-duration", 5);
-        defaults.put("cooldowns.peek", 120);
+        defaults.put("cooldowns.peek", 60);
         defaults.put("statistics.enabled", true);
         defaults.put("statistics.save-interval", 600);
         defaults.put("debug", false);
         defaults.put("limits.max-peek-distance", 50.0);
         defaults.put("privacy.request-timeout", 30);
         defaults.put("privacy.cooldown.enabled", true);
-        defaults.put("privacy.cooldown.duration", 120);
+        defaults.put("privacy.cooldown.duration", 60);
 
         // 声音设置
         defaults.put("sounds.start-peek", "BLOCK_NOTE_BLOCK_PLING");

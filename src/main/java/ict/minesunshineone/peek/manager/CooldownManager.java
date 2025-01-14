@@ -14,7 +14,7 @@ public class CooldownManager {
     private final int cooldownDuration;
 
     public CooldownManager(PeekPlugin plugin) {
-        this.cooldownDuration = plugin.getConfig().getInt("cooldowns.peek", 120);
+        this.cooldownDuration = plugin.getConfig().getInt("cooldowns.peek", 60);
     }
 
     public void setCooldown(Player player) {

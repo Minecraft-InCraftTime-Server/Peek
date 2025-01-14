@@ -35,7 +35,7 @@ public class PrivacyManager {
         this.plugin = plugin;
         this.requestTimeout = plugin.getConfig().getInt("privacy.request-timeout", 30);
         this.cooldownEnabled = plugin.getConfig().getBoolean("privacy.cooldown.enabled", true);
-        this.cooldownDuration = plugin.getConfig().getInt("privacy.cooldown.duration", 120);
+        this.cooldownDuration = plugin.getConfig().getInt("privacy.cooldown.duration", 60);
         this.privacyFile = new File(plugin.getDataFolder(), "privacy.yml");
         this.privacyConfig = YamlConfiguration.loadConfiguration(privacyFile);
         loadPrivacyStates();
