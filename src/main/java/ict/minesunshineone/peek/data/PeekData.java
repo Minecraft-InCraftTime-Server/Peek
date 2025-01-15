@@ -1,9 +1,13 @@
 package ict.minesunshineone.peek.data;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.UUID;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.potion.PotionEffect;
 
 public class PeekData {
 
@@ -11,13 +15,20 @@ public class PeekData {
     private final GameMode originalGameMode;
     private final UUID targetUUID;
     private final long startTime;
+    private final double health;
+    private final int foodLevel;
+    private final Collection<PotionEffect> potionEffects;
     private boolean exiting;
 
-    public PeekData(Location originalLocation, GameMode originalGameMode, UUID targetUUID, long startTime) {
+    public PeekData(Location originalLocation, GameMode originalGameMode, UUID targetUUID,
+            long startTime, double health, int foodLevel, Collection<PotionEffect> potionEffects) {
         this.originalLocation = originalLocation;
         this.originalGameMode = originalGameMode;
         this.targetUUID = targetUUID;
         this.startTime = startTime;
+        this.health = health;
+        this.foodLevel = foodLevel;
+        this.potionEffects = new ArrayList<>(potionEffects);
         this.exiting = false;
     }
 
@@ -43,5 +54,17 @@ public class PeekData {
 
     public void setExiting(boolean exiting) {
         this.exiting = exiting;
+    }
+
+    public double getHealth() {
+        return health;
+    }
+
+    public int getFoodLevel() {
+        return foodLevel;
+    }
+
+    public Collection<PotionEffect> getPotionEffects() {
+        return Collections.unmodifiableCollection(potionEffects);
     }
 }

@@ -45,7 +45,10 @@ public class PeekStateHandler {
                     peeker.getLocation().clone(),
                     peeker.getGameMode(),
                     target.getUniqueId(),
-                    System.currentTimeMillis()
+                    System.currentTimeMillis(),
+                    peeker.getHealth(),
+                    peeker.getFoodLevel(),
+                    peeker.getActivePotionEffects()
             );
 
             activePeeks.put(peeker.getUniqueId(), data);
@@ -170,6 +173,15 @@ public class PeekStateHandler {
                     // 传送成功后再改变游戏模式
                     plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), modeTask -> {
                         peeker.setGameMode(data.getOriginalGameMode());
+                        // 恢复新增状态
+                        peeker.setHealth(Math.min(data.getHealth(), 20));
+                        peeker.setFoodLevel(data.getFoodLevel());
+
+                        // 清除现有效果并应用保存的效果
+                        peeker.getActivePotionEffects().forEach(effect
+                                -> peeker.removePotionEffect(effect.getType()));
+                        data.getPotionEffects().forEach(effect
+                                -> peeker.addPotionEffect(effect));
                     });
                 } else {
                     plugin.getLogger().warning(String.format(
