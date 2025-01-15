@@ -4,8 +4,8 @@ debug: false
 # 限制设置
 limits:
   max-peek-distance: 50.0  # 最大观察距离
-cooldowns:
-  peek: 60 # 观察冷却时间(秒)
+  block-container-interaction: true  # 是否阻止观察者打开容器
+  cooldowns: 60 # 观察冷却时间(秒)
 
 # 隐私设置
 privacy:

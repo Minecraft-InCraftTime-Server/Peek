@@ -11,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import ict.minesunshineone.peek.command.PeekCommand;
 import ict.minesunshineone.peek.handler.PeekStateHandler;
 import ict.minesunshineone.peek.handler.PeekTargetHandler;
+import ict.minesunshineone.peek.listener.PeekInteractionListener;
 import ict.minesunshineone.peek.listener.PeekListener;
 import ict.minesunshineone.peek.manager.CooldownManager;
 import ict.minesunshineone.peek.manager.PrivacyManager;
@@ -59,6 +60,7 @@ public class PeekPlugin extends JavaPlugin {
 
         // 注册监听器
         getServer().getPluginManager().registerEvents(new PeekListener(this), this);
+        getServer().getPluginManager().registerEvents(new PeekInteractionListener(this), this);
 
         // 如果有PlaceholderAPI，注册变量
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -97,7 +99,7 @@ public class PeekPlugin extends JavaPlugin {
         // 检查并设置必要的配置项
         Map<String, Object> defaults = new HashMap<>();
         defaults.put("language", "zh_CN");
-        defaults.put("cooldowns.peek", 60);
+        defaults.put("limits.cooldowns", 60);
         defaults.put("statistics.enabled", true);
         defaults.put("statistics.save-interval", 600);
         defaults.put("debug", false);
