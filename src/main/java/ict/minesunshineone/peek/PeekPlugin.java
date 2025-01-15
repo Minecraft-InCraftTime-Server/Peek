@@ -104,6 +104,7 @@ public class PeekPlugin extends JavaPlugin {
         defaults.put("statistics.save-interval", 600);
         defaults.put("debug", false);
         defaults.put("limits.max-peek-distance", 50.0);
+        defaults.put("limits.block-container-interaction", false);
         defaults.put("privacy.request-timeout", 30);
         defaults.put("privacy.cooldown.enabled", true);
         defaults.put("privacy.cooldown.duration", 60);
