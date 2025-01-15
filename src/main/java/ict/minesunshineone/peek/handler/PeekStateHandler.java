@@ -33,6 +33,12 @@ public class PeekStateHandler {
             return;
         }
 
+        // 添加死亡检查
+        if (peeker.isDead()) {
+            plugin.getMessages().send(peeker, "cannot-peek-while-dead");
+            return;
+        }
+
         // 防止并发修改
         synchronized (activePeeks) {
             if (activePeeks.containsKey(peeker.getUniqueId())) {

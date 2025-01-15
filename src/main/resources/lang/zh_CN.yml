@@ -41,3 +41,4 @@ messages:
   being-peeked-actionbar: "&d当前有 &f{count} &d个玩家正在贴贴你"
   request-cancelled-death: "  &d你死亡了，贴贴请求已自动取消~"
   request-cancelled-death-target: "  &d对方死亡了，贴贴请求已自动取消~"
+  cannot-peek-while-dead: "&c你无法在死亡状态下使用贴贴功能！"
