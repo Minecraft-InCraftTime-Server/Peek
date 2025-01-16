@@ -9,6 +9,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
@@ -175,10 +176,16 @@ public class PeekStateHandler {
                 peeker.setSpectatorTarget(null);
             }
 
+            // 在传送前先清除动量
+            peeker.setVelocity(new Vector(0, 0, 0));
+
             peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
                 if (success) {
                     // 传送成功后再改变游戏模式
                     plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), modeTask -> {
+                        // 再次确保动量为0
+                        peeker.setVelocity(new Vector(0, 0, 0));
+
                         peeker.setGameMode(data.getOriginalGameMode());
                         // 恢复新增状态
                         peeker.setHealth(Math.min(data.getHealth(), 20));
