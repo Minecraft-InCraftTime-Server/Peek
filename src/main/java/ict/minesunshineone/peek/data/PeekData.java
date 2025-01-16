@@ -17,17 +17,19 @@ public class PeekData {
     private final long startTime;
     private final double health;
     private final int foodLevel;
+    private final float saturation;
     private final Collection<PotionEffect> potionEffects;
     private boolean exiting;
 
     public PeekData(Location originalLocation, GameMode originalGameMode, UUID targetUUID,
-            long startTime, double health, int foodLevel, Collection<PotionEffect> potionEffects) {
+            long startTime, double health, int foodLevel, float saturation, Collection<PotionEffect> potionEffects) {
         this.originalLocation = originalLocation;
         this.originalGameMode = originalGameMode;
         this.targetUUID = targetUUID;
         this.startTime = startTime;
         this.health = health;
         this.foodLevel = foodLevel;
+        this.saturation = saturation;
         this.potionEffects = new ArrayList<>(potionEffects);
         this.exiting = false;
     }
@@ -66,5 +68,9 @@ public class PeekData {
 
     public Collection<PotionEffect> getPotionEffects() {
         return Collections.unmodifiableCollection(potionEffects);
+    }
+
+    public float getSaturation() {
+        return saturation;
     }
 }

@@ -54,6 +54,7 @@ public class PeekStateHandler {
                     System.currentTimeMillis(),
                     peeker.getHealth(),
                     peeker.getFoodLevel(),
+                    peeker.getSaturation(),
                     peeker.getActivePotionEffects()
             );
 
@@ -182,6 +183,7 @@ public class PeekStateHandler {
                         // 恢复新增状态
                         peeker.setHealth(Math.min(data.getHealth(), 20));
                         peeker.setFoodLevel(data.getFoodLevel());
+                        peeker.setSaturation(data.getSaturation());
 
                         // 清除现有效果并应用保存的效果
                         peeker.getActivePotionEffects().forEach(effect

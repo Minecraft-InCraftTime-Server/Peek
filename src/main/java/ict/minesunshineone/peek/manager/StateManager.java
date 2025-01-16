@@ -44,6 +44,7 @@ public class StateManager {
         // 保存新增状态数据
         config.set("health", data.getHealth());
         config.set("food_level", data.getFoodLevel());
+        config.set("saturation", data.getSaturation());
 
         // 保存药水效果
         List<Map<String, Object>> effects = new ArrayList<>();
@@ -82,6 +83,7 @@ public class StateManager {
             // 加载新增状态数据
             double health = config.getDouble("health", 20.0);
             int foodLevel = config.getInt("food_level", 20);
+            float saturation = (float) config.getDouble("saturation", 5.0);
 
             // 加载药水效果
             List<PotionEffect> effects = new ArrayList<>();
@@ -100,7 +102,7 @@ public class StateManager {
                 }
             }
 
-            return new PeekData(location, gameMode, targetUUID, startTime, health, foodLevel, effects);
+            return new PeekData(location, gameMode, targetUUID, startTime, health, foodLevel, saturation, effects);
         } catch (Exception e) {
             plugin.getLogger().warning(String.format("无法加载玩家 %s 的状态: %s", player.getName(), e.getMessage()));
             return null;
