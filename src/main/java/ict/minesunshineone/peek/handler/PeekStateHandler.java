@@ -267,6 +267,12 @@ public class PeekStateHandler {
                         }
 
                         try {
+                            // 检查观察者是否死亡
+                            if (peeker.isDead()) {
+                                plugin.getMessages().send(peeker, "peek-ended-death");
+                                return;
+                            }
+
                             if (peeker.getWorld().equals(target.getWorld())) {
                                 double distance = peeker.getLocation().distance(target.getLocation());
                                 if (distance > maxPeekDistance) {
