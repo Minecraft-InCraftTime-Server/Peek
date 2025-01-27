@@ -164,7 +164,7 @@ public class PeekStateHandler {
         });
     }
 
-    private void restorePlayerState(Player peeker, PeekData data) {
+    public void restorePlayerState(Player peeker, PeekData data) {
         plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), task -> {
             // 如果玩家在睡觉，先让他离开床
             if (peeker.isSleeping()) {

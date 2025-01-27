@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -31,9 +30,6 @@ public class PeekListener implements Listener {
 
         // 如果是观察者下线，只记录状态，不执行恢复操作
         if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
-            // 只保存状态，不调用endPeek
-            plugin.getStateManager().savePlayerState(player,
-                    plugin.getStateHandler().getActivePeeks().get(player.getUniqueId()));
 
             // 移除活跃观察记录，但保留状态文件
             plugin.getStateHandler().removeActivePeek(player);
@@ -63,36 +59,25 @@ public class PeekListener implements Listener {
         // 检查是否有未恢复的状态
         PeekData savedState = plugin.getStateManager().getPlayerState(player);
         if (savedState != null) {
-            // 发送断线重连提示
-            plugin.getMessages().send(player, "peek-end-offline");
-            // 恢复玩家状态
-            plugin.getServer().getRegionScheduler().run(plugin,
-                    savedState.getOriginalLocation(),
+            // 启动一个循环任务检查玩家是否还在死亡状态
+            plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
+                    player.getLocation(),
                     task -> {
-                        player.teleportAsync(savedState.getOriginalLocation())
-                                .thenAccept(success -> {
-                                    if (success) {
-                                        player.setGameMode(savedState.getOriginalGameMode());
-                                        plugin.getStateManager().clearPlayerState(player);
-                                    } else {
-                                        Location spawnLoc = player.getBedSpawnLocation() != null
-                                                ? player.getBedSpawnLocation()
-                                                : player.getWorld().getSpawnLocation();
+                        if (!player.isOnline()) {
+                            task.cancel();
+                            return;
+                        }
 
-                                        if (spawnLoc != null) {
-                                            player.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
-                                                if (spawnSuccess) {
-                                                    player.setGameMode(savedState.getOriginalGameMode());
-                                                }
-                                                plugin.getStateManager().clearPlayerState(player);
-                                            });
-                                        } else {
-                                            plugin.getLogger().warning(String.format("无法找到玩家 %s 的有效重生点", player.getName()));
-                                            plugin.getStateManager().clearPlayerState(player);
-                                        }
-                                    }
-                                });
-                    });
+                        if (!player.isDead()) {
+                            task.cancel();
+                            // 直接恢复状态
+                            plugin.getStateHandler().restorePlayerState(player, savedState);
+                            plugin.getStateManager().clearPlayerState(player);
+                            // 发送断线重连提示
+                            plugin.getMessages().send(player, "peek-end-offline");
+                        }
+                    },
+                    1L, 20L); // 每秒检查一次
         }
     }
 
