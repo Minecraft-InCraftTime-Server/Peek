@@ -42,3 +42,4 @@ messages:
   request-cancelled-death: "  &d你死亡了，贴贴请求已自动取消~"
   request-cancelled-death-target: "  &d对方死亡了，贴贴请求已自动取消~"
   cannot-peek-while-dead: "&c你无法在死亡状态下使用贴贴功能！"
+  peek-end-respawn: "&a你已重生，贴贴状态已恢复~"

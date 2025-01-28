@@ -44,3 +44,4 @@ messages:
   request-cancelled-death: "  &dYou died, and the peek request has been automatically canceled."
   request-cancelled-death-target: "  &dThe other player has died, and the peek request has been automatically canceled."
   cannot-peek-while-dead: "&cYou can't use peek feature when you died."
+  peek-end-respawn: "&aYou have respawned, your peek state has been restored~"
