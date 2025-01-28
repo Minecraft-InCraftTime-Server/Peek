@@ -106,10 +106,36 @@ public class PeekStateHandler {
             stopRangeChecker(peeker);
 
             if (shouldRestore && peeker.isOnline()) {
-                restorePlayerState(peeker, data);
+                if (peeker.isDead()) {
+                    // 如果玩家处于死亡状态，保存状态并启动重生检查
+                    plugin.getStateManager().savePlayerState(peeker, data);
+
+                    // 启动重生检查任务
+                    plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
+                            peeker.getLocation(),
+                            task -> {
+                                if (!peeker.isOnline()) {
+                                    task.cancel();
+                                    return;
+                                }
+
+                                if (!peeker.isDead()) {
+                                    task.cancel();
+                                    // 玩家重生后恢复状态
+                                    restorePlayerState(peeker, data);
+                                    plugin.getStateManager().clearPlayerState(peeker);
+                                    // 发送重生后恢复提示
+                                    plugin.getMessages().send(peeker, "peek-end-respawn");
+                                }
+                            },
+                            1L, 20L); // 每秒检查一次
+                } else {
+                    // 玩家未死亡，直接恢复状态
+                    restorePlayerState(peeker, data);
+                }
             }
 
-            if (shouldRestore) {
+            if (shouldRestore && !peeker.isDead()) {
                 plugin.getStateManager().clearPlayerState(peeker);
             }
 
