@@ -145,6 +145,11 @@ public class PeekStateHandler {
                     peeker.wakeup(false);
                 }
 
+                // 如果玩家在附身状态，先退出附身
+                if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
+                    peeker.setSpectatorTarget(null);
+                }
+
                 peeker.setGameMode(GameMode.SPECTATOR);
 
                 // 切换完成后再传送
@@ -166,10 +171,6 @@ public class PeekStateHandler {
 
     public void restorePlayerState(Player peeker, PeekData data) {
         plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), task -> {
-            // 如果玩家在睡觉，先让他离开床
-            if (peeker.isSleeping()) {
-                peeker.wakeup(false);
-            }
 
             // 如果玩家在附身状态，先退出附身
             if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
@@ -261,7 +262,7 @@ public class PeekStateHandler {
             ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
                     target.getLocation(), // 使用target的位置而不是peeker的位置
                     scheduledTask -> {
-                        if (!peeker.isOnline() || !target.isOnline()) {
+                        if (!target.isOnline()) {
                             endPeek(peeker);
                             return;
                         }
@@ -269,7 +270,6 @@ public class PeekStateHandler {
                         try {
                             // 检查观察者是否死亡
                             if (peeker.isDead()) {
-                                plugin.getMessages().send(peeker, "peek-ended-death");
                                 return;
                             }
 
@@ -289,7 +289,7 @@ public class PeekStateHandler {
                             endPeek(peeker);
                         }
                     },
-                    1L, 100L);
+                    1L, 60L);
 
             rangeCheckers.put(peeker.getUniqueId(), task);
         }
