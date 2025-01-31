@@ -107,9 +107,6 @@ public class PeekStateHandler {
 
             if (shouldRestore && peeker.isOnline()) {
                 if (peeker.isDead()) {
-                    // 如果玩家处于死亡状态，保存状态并启动重生检查
-                    plugin.getStateManager().savePlayerState(peeker, data);
-
                     // 启动重生检查任务
                     plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
                             peeker.getLocation(),
@@ -315,7 +312,7 @@ public class PeekStateHandler {
                             endPeek(peeker);
                         }
                     },
-                    1L, 60L);
+                    1L, 10L);
 
             rangeCheckers.put(peeker.getUniqueId(), task);
         }
