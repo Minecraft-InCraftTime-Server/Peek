@@ -245,7 +245,7 @@ public class PeekStateHandler {
                         plugin.getMessages().send(peeker, "teleport-failed");
                     }
                 });
-            }, 10L);
+            }, 5L);
         });
     }
 
