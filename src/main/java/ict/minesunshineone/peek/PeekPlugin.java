@@ -13,6 +13,7 @@ import ict.minesunshineone.peek.handler.PeekStateHandler;
 import ict.minesunshineone.peek.handler.PeekTargetHandler;
 import ict.minesunshineone.peek.listener.PeekInteractionListener;
 import ict.minesunshineone.peek.listener.PeekListener;
+import ict.minesunshineone.peek.listener.PeekPacketListener;
 import ict.minesunshineone.peek.manager.CooldownManager;
 import ict.minesunshineone.peek.manager.PrivacyManager;
 import ict.minesunshineone.peek.manager.StateManager;
@@ -32,6 +33,7 @@ public class PeekPlugin extends JavaPlugin {
     private CooldownManager cooldownManager;
     private PrivacyManager privacyManager;
     private StatisticsManager statisticsManager;
+    private PeekPacketListener packetListener;
 
     @Override
     public void onEnable() {
@@ -47,6 +49,12 @@ public class PeekPlugin extends JavaPlugin {
         this.cooldownManager = new CooldownManager(this);
         this.privacyManager = new PrivacyManager(this);
         this.statisticsManager = new StatisticsManager(this);
+
+        // 如果服务器有ProtocolLib，初始化数据包监听器
+        if (getServer().getPluginManager().getPlugin("ProtocolLib") != null) {
+            this.packetListener = new PeekPacketListener(this);
+            getLogger().info("已启用ProtocolLib支持！");
+        }
 
         // 注册命令
         PeekCommand peekCommand = new PeekCommand(this);
@@ -87,6 +95,10 @@ public class PeekPlugin extends JavaPlugin {
 
         if (privacyManager != null) {
             privacyManager.savePrivacyStates();
+        }
+
+        if (packetListener != null) {
+            packetListener.unregisterPacketListeners();
         }
 
         getLogger().info("Peek插件已禁用！");
