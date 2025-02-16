@@ -217,35 +217,33 @@ public class PeekStateHandler {
             // 在传送前先清除动量
             peeker.setVelocity(new Vector(0, 0, 0));
 
-            // 延迟2tick后传送
-            plugin.getServer().getRegionScheduler().runDelayed(plugin, data.getOriginalLocation(), delayedTask -> {
-                peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
-                    if (!success) {
-                        plugin.getLogger().warning(String.format(
-                                "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
-                                peeker.getName()
-                        ));
+            // 直接传送
+            peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
+                if (!success) {
+                    plugin.getLogger().warning(String.format(
+                            "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
+                            peeker.getName()
+                    ));
 
-                        Location spawnLoc = peeker.getBedSpawnLocation() != null
-                                ? peeker.getBedSpawnLocation()
-                                : peeker.getWorld().getSpawnLocation();
+                    Location spawnLoc = peeker.getBedSpawnLocation() != null
+                            ? peeker.getBedSpawnLocation()
+                            : peeker.getWorld().getSpawnLocation();
 
-                        if (spawnLoc != null) {
-                            plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
-                                peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
-                                    if (!spawnSuccess) {
-                                        plugin.getLogger().severe(String.format(
-                                                "无法将玩家 %s 传送到任何安全位置",
-                                                peeker.getName()
-                                        ));
-                                    }
-                                });
+                    if (spawnLoc != null) {
+                        plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
+                            peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
+                                if (!spawnSuccess) {
+                                    plugin.getLogger().severe(String.format(
+                                            "无法将玩家 %s 传送到任何安全位置",
+                                            peeker.getName()
+                                    ));
+                                }
                             });
-                        }
-                        plugin.getMessages().send(peeker, "teleport-failed");
+                        });
                     }
-                });
-            }, 2L);
+                    plugin.getMessages().send(peeker, "teleport-failed");
+                }
+            });
         });
     }
 
