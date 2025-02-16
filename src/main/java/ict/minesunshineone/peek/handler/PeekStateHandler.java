@@ -217,7 +217,7 @@ public class PeekStateHandler {
             // 在传送前先清除动量
             peeker.setVelocity(new Vector(0, 0, 0));
 
-            // 延迟2tick后传送
+            // 延迟1tick后传送
             plugin.getServer().getRegionScheduler().runDelayed(plugin, data.getOriginalLocation(), delayedTask -> {
                 peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
                     if (!success) {
@@ -245,7 +245,7 @@ public class PeekStateHandler {
                         plugin.getMessages().send(peeker, "teleport-failed");
                     }
                 });
-            }, 2L);
+            }, 5L);
         });
     }
 
