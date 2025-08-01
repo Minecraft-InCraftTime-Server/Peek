@@ -18,6 +18,9 @@ permissions:
   peek.use:
     description: 允许使用peek命令
     default: op
+  peek.self:
+    description: 允许使用peek self命令在原地开启观察者模式
+    default: op
   peek.bypass:
     description: 允许绕过私人模式
     default: op

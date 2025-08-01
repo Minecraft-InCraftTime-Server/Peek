@@ -49,6 +49,8 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                 handleAccept(player);
             case "deny" ->
                 handleDeny(player);
+            case "self" ->
+                handleSelfPeek(player);
             default ->
                 handlePeek(player, args[0]);
         };
@@ -99,6 +101,37 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSelfPeek(Player player) {
+        // 检查玩家是否有权限
+        if (!player.hasPermission("peek.self")) {
+            plugin.getMessages().send(player, "no-permission");
+            return true;
+        }
+
+        // 检查玩家是否已经在peek状态
+        if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
+            plugin.getMessages().send(player, "already-peeking");
+            return true;
+        }
+
+        // 检查玩家是否死亡
+        if (player.isDead()) {
+            plugin.getMessages().send(player, "cannot-peek-while-dead");
+            return true;
+        }
+
+        // 检查冷却时间
+        if (plugin.getCooldownManager().isOnCooldown(player)) {
+            plugin.getMessages().send(player, "cooldown-peek", "time",
+                    String.valueOf(plugin.getCooldownManager().getRemainingCooldown(player)));
+            return true;
+        }
+
+        // 开始self peek
+        plugin.getStateHandler().startSelfPeek(player);
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!(sender instanceof Player)) {
@@ -112,6 +145,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             completions.add("privacy");
             completions.add("accept");
             completions.add("deny");
+            completions.add("self");
 
             if (sender.hasPermission("peek.use")) {
                 plugin.getServer().getOnlinePlayers().stream()

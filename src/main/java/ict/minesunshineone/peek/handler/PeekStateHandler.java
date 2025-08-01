@@ -76,6 +76,83 @@ public class PeekStateHandler {
         updateActionBar(target);
     }
 
+    public void startSelfPeek(Player peeker) {
+        if (peeker == null) {
+            plugin.getLogger().warning("尝试对空玩家使用自我观察功能");
+            return;
+        }
+
+        // 添加死亡检查
+        if (peeker.isDead()) {
+            plugin.getMessages().send(peeker, "cannot-peek-while-dead");
+            return;
+        }
+
+        // 添加在线检查
+        if (!peeker.isOnline()) {
+            plugin.getLogger().warning(String.format("尝试对离线玩家 %s 使用自我观察功能", peeker.getName()));
+            return;
+        }
+
+        // 防止并发修改
+        synchronized (activePeeks) {
+            if (activePeeks.containsKey(peeker.getUniqueId())) {
+                plugin.getMessages().send(peeker, "already-peeking");
+                return;
+            }
+
+            try {
+                logDebug("Starting self peek: %s", peeker.getName());
+                
+                // 保存当前位置作为原始位置
+                Location originalLocation = peeker.getLocation().clone();
+                
+                // 创建特殊的 PeekData，目标设为自己
+                PeekData data = new PeekData(
+                        originalLocation,
+                        peeker.getGameMode(),
+                        peeker.getUniqueId(), // 目标设为自己
+                        System.currentTimeMillis(),
+                        peeker.getHealth(),
+                        peeker.getFoodLevel(),
+                        peeker.getSaturation(),
+                        peeker.getActivePotionEffects()
+                );
+
+                activePeeks.put(peeker.getUniqueId(), data);
+                plugin.getStateManager().savePlayerState(peeker, data);
+                plugin.getStatisticsManager().recordPeekStart(peeker, peeker); // 统计中目标也是自己
+
+                // 设置为观察者模式但不传送
+                setSelfPeekGameMode(peeker);
+                
+                // 发送消息
+                plugin.getMessages().send(peeker, "self-peek-start");
+
+                // 播放声音
+                playSound(peeker, "start-peek");
+
+                // 启动self距离检查器，确保不会超出距离限制
+                startSelfRangeChecker(peeker, originalLocation);
+                
+                logDebug("Self peek started successfully for player: %s", peeker.getName());
+                
+            } catch (Exception e) {
+                plugin.getLogger().warning(String.format("启动自我观察时发生错误，玩家: %s，错误: %s", peeker.getName(), e.getMessage()));
+                if (plugin.getConfig().getBoolean("debug", false)) {
+                    e.printStackTrace();
+                }
+                
+                // 清理可能的残留状态
+                activePeeks.remove(peeker.getUniqueId());
+                stopRangeChecker(peeker);
+                
+                // 通知玩家发生错误
+                plugin.getMessages().send(peeker, "command-error");
+            }
+        }
+    }
+
     public void endPeek(Player peeker, boolean shouldRestore) {
         if (peeker == null) {
             plugin.getLogger().warning("尝试对空玩家结束贴贴功能");
@@ -140,7 +217,12 @@ public class PeekStateHandler {
             if (peeker.isOnline()) {
                 plugin.getMessages().send(peeker, "peek-end");
             }
-            if (target != null && target.isOnline()) {
+            
+            // 检查是否是自我观察模式（target是自己）
+            boolean isSelfPeek = target != null && target.getUniqueId().equals(peeker.getUniqueId());
+            
+            // 只有在非自我观察模式下才给目标发送消息
+            if (target != null && target.isOnline() && !isSelfPeek) {
                 plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
                 playSound(target, "end-peek");
             }
@@ -148,8 +230,8 @@ public class PeekStateHandler {
             // 最后才移除活动peek
             activePeeks.remove(peeker.getUniqueId());
 
-            // 更新目标玩家的actionbar
-            if (target != null && target.isOnline()) {
+            // 更新目标玩家的actionbar（自我观察时不需要更新）
+            if (target != null && target.isOnline() && !isSelfPeek) {
                 updateActionBar(target);
             }
         }
@@ -168,23 +250,28 @@ public class PeekStateHandler {
                     peeker.wakeup(false);
                 }
 
+                // 传送之前先设置为蹲下
+                peeker.setSneaking(true);
+
                 // 如果玩家在附身状态，先退出附身
                 if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
                     peeker.setSpectatorTarget(null);
                 }
 
+                // 设置为旁观模式
                 peeker.setGameMode(GameMode.SPECTATOR);
 
-                // 切换完成后再传送
-                peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
-                    if (!success) {
-                        plugin.getMessages().send(peeker, "teleport-failed");
-                        endPeek(peeker);
-                    } else {
-                        // 传送成功后再启动距离检查器
-                        startRangeChecker(peeker, target);
-                    }
-                });
+                // 等待1 tick后再传送
+                plugin.getServer().getRegionScheduler().runDelayed(plugin, peeker.getLocation(), delayedTask -> {
+                    peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
+                        if (!success) {
+                            plugin.getMessages().send(peeker, "teleport-failed");
+                            endPeek(peeker);
+                        } else {
+                            startRangeChecker(peeker, target);
+                        }
+                    });
+                }, 2L); // 2 tick 延迟
             } catch (Exception e) {
                 plugin.getLogger().warning(String.format("为玩家 %s 切换游戏模式时发生错误", peeker.getName()));
                 endPeek(peeker);
@@ -351,6 +438,108 @@ public class PeekStateHandler {
         if (peekerCount > 0) {
             plugin.getMessages().sendActionBar(target, "being-peeked-actionbar",
                     "count", String.valueOf(peekerCount));
+        }
+    }
+
+    private void setSelfPeekGameMode(Player peeker) {
+        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
+            try {
+                // 额外的在线检查
+                if (!peeker.isOnline()) {
+                    plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线", peeker.getName()));
+                    endPeek(peeker, false);
+                    return;
+                }
+
+                // 死亡检查
+                if (peeker.isDead()) {
+                    plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已死亡", peeker.getName()));
+                    plugin.getMessages().send(peeker, "cannot-peek-while-dead");
+                    endPeek(peeker, false);
+                    return;
+                }
+
+                // 如果玩家在睡觉，先让他离开床
+                if (peeker.isSleeping()) {
+                    peeker.wakeup(false);
+                }
+
+                // 如果玩家在附身状态，先退出附身
+                if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
+                    peeker.setSpectatorTarget(null);
+                }
+
+                // 设置为旁观模式，但不传送
+                peeker.setGameMode(GameMode.SPECTATOR);
+                
+                logDebug("Successfully set self peek game mode for player: %s", peeker.getName());
+            } catch (Exception e) {
+                plugin.getLogger().warning(String.format("为玩家 %s 设置自我观察模式时发生错误: %s", peeker.getName(), e.getMessage()));
+                if (plugin.getConfig().getBoolean("debug", false)) {
+                    e.printStackTrace();
+                }
+                endPeek(peeker);
+            }
+        });
+    }
+
+    private void startSelfRangeChecker(Player peeker, Location originalLocation) {
+        synchronized (rangeCheckersLock) {
+            // 先停止已有的检查器（如果有的话）
+            stopRangeChecker(peeker);
+
+            ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
+                    originalLocation, // 使用原始位置
+                    scheduledTask -> {
+                        // 检查玩家是否在线
+                        if (!peeker.isOnline()) {
+                            logDebug("Player %s went offline during self peek, ending peek", peeker.getName());
+                            endPeek(peeker);
+                            return;
+                        }
+
+                        try {
+                            // 检查观察者是否死亡（与普通peek逻辑一致）
+                            if (peeker.isDead()) {
+                                logDebug("Player %s died during self peek, but continuing to monitor for respawn", peeker.getName());
+                                return; // 不立即结束，等待重生处理
+                            }
+
+                            // 额外的状态检查
+                            PeekData data = activePeeks.get(peeker.getUniqueId());
+                            if (data == null) {
+                                logDebug("PeekData for player %s is null, stopping range checker", peeker.getName());
+                                scheduledTask.cancel();
+                                return;
+                            }
+
+                            // 检查是否超出距离限制（相对于原始位置）
+                            if (peeker.getWorld().equals(originalLocation.getWorld())) {
+                                double distance = peeker.getLocation().distance(originalLocation);
+                                if (distance > maxPeekDistance) {
+                                    logDebug("Player %s exceeded self peek distance: %.2f > %.2f", 
+                                            peeker.getName(), distance, maxPeekDistance);
+                                    plugin.getMessages().send(peeker, "self-peek-range-exceeded");
+                                    endPeek(peeker);
+                                }
+                            } else {
+                                // 如果换了世界，自动结束自我观察
+                                logDebug("Player %s changed world during self peek", peeker.getName());
+                                plugin.getMessages().send(peeker, "self-peek-world-changed");
+                                endPeek(peeker);
+                            }
+                        } catch (Exception e) {
+                            plugin.getLogger().warning(String.format("自我观察距离检查时发生错误：%s", e.getMessage()));
+                            if (plugin.getConfig().getBoolean("debug", false)) {
+                                e.printStackTrace();
+                            }
+                            endPeek(peeker);
+                        }
+                    },
+                    1L, 10L);
+
+            rangeCheckers.put(peeker.getUniqueId(), task);
+            logDebug("Started self range checker for player: %s", peeker.getName());
         }
     }
 }

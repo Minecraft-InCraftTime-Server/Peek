@@ -39,9 +39,14 @@ public class PeekListener implements Listener {
         }
 
         // 如果是被观察者下线，结束所有观察他的玩家的观察状态
+        // 但要排除自我观察的情况（观察者和被观察者是同一人）
         for (Map.Entry<UUID, PeekData> entry : new HashMap<>(plugin.getStateHandler().getActivePeeks()).entrySet()) {
-            if (player.getUniqueId().equals(entry.getValue().getTargetUUID())) {
-                Player peeker = plugin.getServer().getPlayer(entry.getKey());
+            UUID peekerUUID = entry.getKey();
+            UUID targetUUID = entry.getValue().getTargetUUID();
+            
+            // 如果被观察者下线了，且不是自我观察
+            if (player.getUniqueId().equals(targetUUID) && !peekerUUID.equals(targetUUID)) {
+                Player peeker = plugin.getServer().getPlayer(peekerUUID);
                 if (peeker != null) {
                     plugin.getStateHandler().endPeek(peeker);
                 }
