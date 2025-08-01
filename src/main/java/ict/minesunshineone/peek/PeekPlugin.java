@@ -93,9 +93,8 @@ public class PeekPlugin extends JavaPlugin {
             statisticsManager.saveStats();
         }
 
-        if (privacyManager != null) {
-            privacyManager.savePrivacyStates();
-        }
+        // 注意：隐私管理器现在使用 PersistentData，无需手动保存
+        // 数据会自动随玩家数据保存，支持 HuskSync 等跨服同步插件
 
         if (packetListener != null) {
             packetListener.unregisterPacketListeners();
@@ -182,5 +181,17 @@ public class PeekPlugin extends JavaPlugin {
 
     public StatisticsManager getStatisticsManager() {
         return statisticsManager;
+    }
+
+    /**
+     * 重新加载配置和消息文件
+     * 用于调试或运行时更新配置
+     */
+    public void reloadConfigs() {
+        reloadConfig();
+        if (messages != null) {
+            messages.reloadMessages();
+        }
+        getLogger().info("配置文件已重新加载");
     }
 }

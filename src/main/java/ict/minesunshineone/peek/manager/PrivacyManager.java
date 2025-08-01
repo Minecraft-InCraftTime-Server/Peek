@@ -1,18 +1,13 @@
 package ict.minesunshineone.peek.manager;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -20,65 +15,154 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 public class PrivacyManager {
 
     private final PeekPlugin plugin;
-    private final Set<UUID> privateModeUsers = new HashSet<>();
     private final Map<UUID, Map<UUID, ScheduledTask>> pendingRequests = new HashMap<>();
     private final Map<String, Long> requestCooldowns = new HashMap<>();
 
     private final int requestTimeout;
     private final boolean cooldownEnabled;
     private final int cooldownDuration;
-
-    private final File privacyFile;
-    private final YamlConfiguration privacyConfig;
+    
+    // PersistentData Key for privacy mode
+    private final NamespacedKey PRIVACY_MODE_KEY;
 
     public PrivacyManager(PeekPlugin plugin) {
         this.plugin = plugin;
         this.requestTimeout = plugin.getConfig().getInt("privacy.request-timeout", 30);
         this.cooldownEnabled = plugin.getConfig().getBoolean("privacy.cooldown.enabled", true);
         this.cooldownDuration = plugin.getConfig().getInt("privacy.cooldown.duration", 60);
-        this.privacyFile = new File(plugin.getDataFolder(), "privacy.yml");
-        this.privacyConfig = YamlConfiguration.loadConfiguration(privacyFile);
-        loadPrivacyStates();
+        this.PRIVACY_MODE_KEY = new NamespacedKey(plugin, "privacy_mode");
+        
+        plugin.getLogger().info("隐私管理器已初始化，使用 PersistentData 存储隐私模式设置");
     }
 
-    private void loadPrivacyStates() {
-        List<String> uuids = privacyConfig.getStringList("private_mode_players");
-        privateModeUsers.clear();
-        for (String uuid : uuids) {
-            try {
-                privateModeUsers.add(UUID.fromString(uuid));
-            } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning(String.format("无效的UUID格式: %s", uuid));
-            }
-        }
-    }
-
-    public void savePrivacyStates() {
-        List<String> uuids = privateModeUsers.stream()
-                .map(UUID::toString)
-                .collect(Collectors.toList());
-        privacyConfig.set("private_mode_players", uuids);
-        try {
-            privacyConfig.save(privacyFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning(String.format("无法保存私人模式状态: %s", e.getMessage()));
-        }
-    }
-
+    /**
+     * 检查玩家是否启用了私人模式
+     * 使用 PersistentData 存储，支持跨服同步
+     */
     public boolean isPrivateMode(Player player) {
-        return privateModeUsers.contains(player.getUniqueId());
+        if (player == null || !player.isOnline()) {
+            return false;
+        }
+        
+        return player.getPersistentDataContainer()
+                .getOrDefault(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 0) == 1;
     }
 
+    /**
+     * 切换玩家的私人模式状态
+     * 使用 PersistentData 存储，支持跨服同步
+     */
     public void togglePrivateMode(Player player) {
-        UUID uuid = player.getUniqueId();
-        if (privateModeUsers.contains(uuid)) {
-            privateModeUsers.remove(uuid);
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        
+        boolean currentMode = isPrivateMode(player);
+        
+        if (currentMode) {
+            // 禁用私人模式
+            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 0);
             plugin.getMessages().send(player, "privacy-mode-disabled");
+            
+            // 取消所有待处理的请求
+            cancelAllPendingRequests(player);
         } else {
-            privateModeUsers.add(uuid);
+            // 启用私人模式
+            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 1);
             plugin.getMessages().send(player, "privacy-mode-enabled");
         }
-        savePrivacyStates();
+        
+        plugin.getLogger().info(String.format("玩家 %s %s了私人模式", 
+                player.getName(), currentMode ? "禁用" : "启用"));
+    }
+
+    /**
+     * 清除玩家的私人模式状态（用于调试或管理员操作）
+     */
+    public void clearPrivateMode(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        
+        player.getPersistentDataContainer().remove(PRIVACY_MODE_KEY);
+        plugin.getLogger().info(String.format("已清除玩家 %s 的私人模式设置", player.getName()));
+    }
+
+    /**
+     * 管理员方法：设置玩家的隐私模式状态
+     * @param player 目标玩家
+     * @param enabled 是否启用隐私模式
+     */
+    public void setPrivateMode(Player player, boolean enabled) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        
+        if (enabled) {
+            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 1);
+        } else {
+            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 0);
+        }
+        
+        plugin.getLogger().info(String.format("管理员设置玩家 %s 的隐私模式为: %s", 
+                player.getName(), enabled ? "启用" : "禁用"));
+    }
+
+    /**
+     * 获取所有在线玩家中启用了隐私模式的玩家数量
+     */
+    public int getPrivateModePlayerCount() {
+        return (int) plugin.getServer().getOnlinePlayers().stream()
+                .filter(this::isPrivateMode)
+                .count();
+    }
+
+    /**
+     * 调试方法：验证 PersistentData 实施
+     */
+    public String debugPrivacyStatus(Player player) {
+        if (player == null) {
+            return "玩家为空";
+        }
+        
+        boolean hasKey = player.getPersistentDataContainer().has(PRIVACY_MODE_KEY, PersistentDataType.BYTE);
+        byte value = player.getPersistentDataContainer().getOrDefault(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) -1);
+        boolean isPrivate = isPrivateMode(player);
+        
+        return String.format("玩家: %s | 有PersistentData键: %s | 值: %d | 隐私模式: %s", 
+                player.getName(), hasKey, value, isPrivate);
+    }
+
+    /**
+     * 取消玩家的所有待处理请求
+     */
+    private void cancelAllPendingRequests(Player player) {
+        UUID playerUuid = player.getUniqueId();
+        
+        // 取消作为目标的所有请求
+        Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(playerUuid);
+        if (targetRequests != null) {
+            for (Map.Entry<UUID, ScheduledTask> entry : targetRequests.entrySet()) {
+                entry.getValue().cancel();
+                Player requester = plugin.getServer().getPlayer(entry.getKey());
+                if (requester != null && requester.isOnline()) {
+                    plugin.getMessages().send(requester, "request-cancel");
+                }
+            }
+            pendingRequests.remove(playerUuid);
+        }
+        
+        // 取消作为请求者的所有请求
+        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry : pendingRequests.entrySet()) {
+            ScheduledTask task = entry.getValue().remove(playerUuid);
+            if (task != null) {
+                task.cancel();
+                Player target = plugin.getServer().getPlayer(entry.getKey());
+                if (target != null && target.isOnline()) {
+                    plugin.getMessages().send(target, "request-cancel");
+                }
+            }
+        }
     }
 
     public void sendPeekRequest(Player peeker, Player target) {

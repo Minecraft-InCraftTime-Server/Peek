@@ -98,4 +98,13 @@ public class Messages {
 
         player.sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize(message));
     }
+
+    /**
+     * 重新加载消息文件
+     * 用于调试或在运行时更新消息
+     */
+    public void reloadMessages() {
+        loadMessages();
+        plugin.getLogger().info("消息文件已重新加载");
+    }
 }

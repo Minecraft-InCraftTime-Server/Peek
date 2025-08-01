@@ -9,6 +9,9 @@ limits:
 
 # 隐私设置
 privacy:
+  # 注意: 从 v3.1 开始，隐私模式状态使用 PersistentData 存储
+  # 这意味着隐私模式设置会跟随玩家数据，支持 HuskSync 等跨服同步插件
+  # 旧的 privacy.yml 文件将不再使用
   request-timeout: 30      # 请求超时时间(秒)
   cooldown:
     enabled: true         # 是否启用请求冷却
