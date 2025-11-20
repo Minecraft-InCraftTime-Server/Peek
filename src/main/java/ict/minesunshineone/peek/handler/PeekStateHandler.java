@@ -8,7 +8,10 @@ import java.util.UUID;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.bukkit.util.Vector;
 
 import ict.minesunshineone.peek.PeekPlugin;
@@ -263,7 +266,7 @@ public class PeekStateHandler {
 
                 // 等待1 tick后再传送
                 plugin.getServer().getRegionScheduler().runDelayed(plugin, peeker.getLocation(), delayedTask -> {
-                    peeker.teleportAsync(target.getLocation()).thenAccept(success -> {
+                    peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                         if (!success) {
                             plugin.getMessages().send(peeker, "teleport-failed");
                             endPeek(peeker);
@@ -290,56 +293,100 @@ public class PeekStateHandler {
             // 在传送前先清除动量
             peeker.setVelocity(new Vector(0, 0, 0));
 
-            peeker.teleportAsync(data.getOriginalLocation()).thenAccept(success -> {
+            peeker.teleportAsync(data.getOriginalLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                 if (success) {
                     // 传送成功后再改变游戏模式
                     plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), modeTask -> {
-                        // 再次确保动量为0
-                        peeker.setVelocity(new Vector(0, 0, 0));
-
-                        peeker.setGameMode(data.getOriginalGameMode());
-                        // 恢复新增状态
-                        peeker.setHealth(Math.min(data.getHealth(), 20));
-                        peeker.setFoodLevel(data.getFoodLevel());
-                        peeker.setSaturation(data.getSaturation());
-
-                        // 清除现有效果并应用保存的效果
-                        peeker.getActivePotionEffects().forEach(effect
-                                -> peeker.removePotionEffect(effect.getType()));
-                        data.getPotionEffects().forEach(effect
-                                -> peeker.addPotionEffect(effect));
+                        applyRestoredState(peeker, data);
                     });
                 } else {
-                    plugin.getLogger().warning(String.format(
-                            "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
-                            peeker.getName()
-                    ));
-
-                    Location spawnLoc = peeker.getBedSpawnLocation() != null
-                            ? peeker.getBedSpawnLocation()
-                            : peeker.getWorld().getSpawnLocation();
-
-                    if (spawnLoc != null) {
-                        plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
-                            peeker.teleportAsync(spawnLoc).thenAccept(spawnSuccess -> {
-                                if (spawnSuccess) {
-                                    // 传送到重生点成功后再改变游戏模式
-                                    plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, modeTask -> {
-                                        peeker.setGameMode(data.getOriginalGameMode());
-                                    });
-                                } else {
-                                    plugin.getLogger().severe(String.format(
-                                            "无法将玩家 %s 传送到任何安全位置",
-                                            peeker.getName()
-                                    ));
-                                }
-                            });
-                        });
-                    }
-                    plugin.getMessages().send(peeker, "teleport-failed");
+                    handleTeleportFailure(peeker, data);
                 }
             });
         });
+    }
+
+    private void handleTeleportFailure(Player peeker, PeekData data) {
+        plugin.getLogger().warning(String.format(
+                "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
+                peeker.getName()
+        ));
+
+        Location spawnLoc = resolveSpawnLocation(peeker);
+
+        if (spawnLoc != null) {
+            plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
+                peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
+                    if (spawnSuccess) {
+                        plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, modeTask -> {
+                            applyRestoredState(peeker, data);
+                        });
+                    } else {
+                        plugin.getLogger().severe(String.format(
+                                "无法将玩家 %s 传送到任何安全位置",
+                                peeker.getName()
+                        ));
+                        forceStateRestoreWithoutTeleport(peeker, data);
+                    }
+                });
+            });
+        } else {
+            plugin.getLogger().severe(String.format(
+                    "未找到可用的重生点，强制恢复玩家 %s 的状态",
+                    peeker.getName()
+            ));
+            forceStateRestoreWithoutTeleport(peeker, data);
+        }
+
+        plugin.getMessages().send(peeker, "teleport-failed");
+    }
+
+    private Location resolveSpawnLocation(Player peeker) {
+        Location respawnLocation = peeker.getRespawnLocation();
+        if (respawnLocation != null) {
+            return respawnLocation;
+        }
+
+        if (peeker.getWorld() != null) {
+            return peeker.getWorld().getSpawnLocation();
+        }
+
+        return plugin.getServer().getWorlds().isEmpty()
+                ? null
+                : plugin.getServer().getWorlds().get(0).getSpawnLocation();
+    }
+
+    private void forceStateRestoreWithoutTeleport(Player peeker, PeekData data) {
+        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), modeTask -> {
+            applyRestoredState(peeker, data);
+        });
+    }
+
+    private void applyRestoredState(Player peeker, PeekData data) {
+        // 再次确保动量为0
+        peeker.setVelocity(new Vector(0, 0, 0));
+
+        // 确保观察者附身关系被清除
+        if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
+            peeker.setSpectatorTarget(null);
+        }
+
+        peeker.setGameMode(data.getOriginalGameMode());
+        double maxHealth = getMaxHealth(peeker);
+        peeker.setHealth(Math.min(data.getHealth(), maxHealth));
+        peeker.setFoodLevel(data.getFoodLevel());
+        peeker.setSaturation(data.getSaturation());
+
+        // 清除现有效果并应用保存的效果
+        peeker.getActivePotionEffects().forEach(effect
+                -> peeker.removePotionEffect(effect.getType()));
+        data.getPotionEffects().forEach(effect
+                -> peeker.addPotionEffect(effect));
+    }
+
+    private double getMaxHealth(Player peeker) {
+        AttributeInstance instance = peeker.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        return instance != null ? instance.getValue() : 20.0D;
     }
 
     public Map<UUID, PeekData> getActivePeeks() {

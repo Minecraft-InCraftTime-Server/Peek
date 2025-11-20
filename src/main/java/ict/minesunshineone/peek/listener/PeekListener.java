@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.entity.Player;
+import org.bukkit.GameMode;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -55,6 +56,16 @@ public class PeekListener implements Listener {
 
         // 取消所有相关的请求
         plugin.getPrivacyManager().cancelAllRequests(player);
+
+        // 额外修复：确保所有处于 SPECTATOR 且有保存状态的在线玩家在被观察对象下线时恢复状态
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            PeekData saved = plugin.getStateManager().getPlayerState(online);
+            if (saved != null && online.getGameMode() == GameMode.SPECTATOR) {
+                // 调用 endPeek 来安全地恢复玩家状态（会处理冷却、消息与清理）
+                plugin.getLogger().info(String.format("Restoring peek state for player %s due to target quit", online.getName()));
+                plugin.getStateHandler().endPeek(online);
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
