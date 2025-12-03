@@ -46,6 +46,7 @@ messages:
   cannot-peek-while-dead: "&cYou can't use peek feature when you died."
   peek-end-respawn: "&aYou have respawned, your peek state has been restored~"
   self-peek-start: "  &d✨ Self-peek mode activated! You can now explore freely, remember to use &f/peek exit &dto exit spectator mode~"
+  self-peek-origin: "Origin"
   self-peek-range-exceeded: "  &dYou are too far from your original position, self-peek mode has been automatically ended~"
   self-peek-world-changed: "  &dDetected world change, self-peek mode has been automatically ended~"
   random-peek-selected: "  &d✨ Randomly selected &f{player}&d, starting peek~"

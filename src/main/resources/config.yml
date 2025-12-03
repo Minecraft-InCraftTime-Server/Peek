@@ -26,6 +26,20 @@ sounds:
   start-peek: ENTITY_ENDERMAN_TELEPORT  # 开始观察音效
   end-peek: ENTITY_ENDERMAN_TELEPORT    # 结束观察音效
 
+# BossBar 距离显示设置
+bossbar:
+  enabled: true                          # 是否启用距离 BossBar
+  title: "&d距离 &f{target}&d: &e{distance} &7/ &e{max_distance} &d格"  # 标题格式
+  style: SEGMENTED_10                    # 样式: SOLID, SEGMENTED_6, SEGMENTED_10, SEGMENTED_12, SEGMENTED_20
+  # 颜色阈值设置 (根据距离百分比改变颜色)
+  colors:
+    safe: GREEN          # 距离 < 50% 时的颜色
+    warning: YELLOW      # 距离 50%-75% 时的颜色
+    danger: RED          # 距离 > 75% 时的颜色
+  thresholds:
+    warning: 0.5         # 警告阈值 (50%)
+    danger: 0.75         # 危险阈值 (75%)
+
 # 统计设置
 statistics:
   enabled: true           # 是否启用统计

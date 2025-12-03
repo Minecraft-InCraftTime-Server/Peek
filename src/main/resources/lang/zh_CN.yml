@@ -44,6 +44,7 @@ messages:
   cannot-peek-while-dead: "&c你无法在死亡状态下使用贴贴功能！"
   peek-end-respawn: "&a你已重生，贴贴状态已恢复~"
   self-peek-start: "  &d✨ 自我观察模式已启动！你现在可以自由探索，记得用 &f/peek exit &d退出观察模式~"
+  self-peek-origin: "原点"
   self-peek-range-exceeded: "  &d你离原位置太远了，自我观察模式已自动结束~"
   self-peek-world-changed: "  &d检测到你切换了世界，自我观察模式已自动结束~"
   random-peek-selected: "  &d✨ 随机选中了 &f{player}&d，正在施展贴贴魔法~"

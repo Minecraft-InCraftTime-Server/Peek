@@ -87,6 +87,8 @@ public class PeekPlugin extends JavaPlugin {
                     stateHandler.endPeek(player, true);
                 }
             });
+            // 清理所有剩余资源（BossBar、距离检查器等）
+            stateHandler.cleanup();
         }
 
         if (statisticsManager != null) {

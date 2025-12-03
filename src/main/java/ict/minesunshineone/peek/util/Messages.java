@@ -83,6 +83,11 @@ public class Messages {
         return messages.getString("messages." + key);
     }
 
+    public String get(String key, String defaultValue) {
+        String value = messages.getString("messages." + key);
+        return value != null ? value : defaultValue;
+    }
+
     public void sendActionBar(Player player, String key, String... placeholders) {
         String message = messages.getString("messages." + key);
         if (message == null) {

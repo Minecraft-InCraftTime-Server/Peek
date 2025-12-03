@@ -34,8 +34,9 @@ public class PeekListener implements Listener {
             // 移除活跃观察记录，但保留状态文件
             plugin.getStateHandler().removeActivePeek(player);
 
-            // 停止距离检查器
-            plugin.getStateHandler().stopRangeChecker(player);
+            // 停止距离检查器并移除 BossBar
+            plugin.getStateHandler().getRangeChecker().stopRangeChecker(player);
+            plugin.getStateHandler().getBossBarHandler().safeRemoveDistanceBossBar(player);
         }
 
         // 如果是被观察者下线，结束所有观察他的玩家的观察状态
@@ -76,7 +77,7 @@ public class PeekListener implements Listener {
                         if (!player.isDead()) {
                             task.cancel();
                             // 直接恢复状态
-                            plugin.getStateHandler().restorePlayerState(player, savedState);
+                            plugin.getStateHandler().getStateRestorer().restorePlayerState(player, savedState);
                             plugin.getStateManager().clearPlayerState(player);
                             // 发送断线重连提示
                             plugin.getMessages().send(player, "peek-end-offline");
