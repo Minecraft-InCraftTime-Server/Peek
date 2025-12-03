@@ -5,11 +5,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.bukkit.util.Vector;
@@ -23,6 +27,7 @@ public class PeekStateHandler {
     private final PeekPlugin plugin;
     private final Map<UUID, PeekData> activePeeks = new HashMap<>();
     private final Map<UUID, ScheduledTask> rangeCheckers = new HashMap<>();
+    private final Map<UUID, BossBar> distanceBossBars = new HashMap<>();
     private final Object rangeCheckersLock = new Object();
     private final double maxPeekDistance;
 
@@ -69,14 +74,19 @@ public class PeekStateHandler {
             teleportAndSetGameMode(peeker, target);
         }
 
-        // 发送消息
+        // 检查是否静默 peek（有 bypass 权限）
+        boolean silentPeek = plugin.getTargetHandler().shouldSilentPeek(peeker);
+
+        // 发送消息给观察者
         plugin.getMessages().send(peeker, "peek-start", "player", target.getName());
-        plugin.getMessages().send(target, "being-peeked", "player", peeker.getName());
-
-        // 播放声音
-        playSound(target, "start-peek");
-
-        updateActionBar(target);
+        
+        // 只有非静默模式才通知目标
+        if (!silentPeek) {
+            plugin.getMessages().send(target, "being-peeked", "player", peeker.getName());
+            // 播放声音
+            playSound(target, "start-peek");
+            updateActionBar(target);
+        }
     }
 
     public void startSelfPeek(Player peeker) {
@@ -223,9 +233,11 @@ public class PeekStateHandler {
             
             // 检查是否是自我观察模式（target是自己）
             boolean isSelfPeek = target != null && target.getUniqueId().equals(peeker.getUniqueId());
+            // 检查是否静默 peek（有 bypass 权限）
+            boolean silentPeek = peeker.isOnline() && plugin.getTargetHandler().shouldSilentPeek(peeker);
             
-            // 只有在非自我观察模式下才给目标发送消息
-            if (target != null && target.isOnline() && !isSelfPeek) {
+            // 只有在非自我观察模式且非静默模式下才给目标发送消息
+            if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
                 plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
                 playSound(target, "end-peek");
             }
@@ -233,8 +245,8 @@ public class PeekStateHandler {
             // 最后才移除活动peek
             activePeeks.remove(peeker.getUniqueId());
 
-            // 更新目标玩家的actionbar（自我观察时不需要更新）
-            if (target != null && target.isOnline() && !isSelfPeek) {
+            // 更新目标玩家的actionbar（自我观察时不需要更新，静默模式也不更新）
+            if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
                 updateActionBar(target);
             }
         }
@@ -271,7 +283,11 @@ public class PeekStateHandler {
                             plugin.getMessages().send(peeker, "teleport-failed");
                             endPeek(peeker);
                         } else {
-                            startRangeChecker(peeker, target);
+                            // 传送成功后，使用玩家的实体调度器确保在正确线程执行
+                            peeker.getScheduler().run(plugin, scheduledTask -> {
+                                startRangeChecker(peeker, target);
+                                createDistanceBossBar(peeker, target);
+                            }, null);
                         }
                     });
                 }, 2L); // 2 tick 延迟
@@ -432,6 +448,7 @@ public class PeekStateHandler {
 
                             if (peeker.getWorld().equals(target.getWorld())) {
                                 double distance = peeker.getLocation().distance(target.getLocation());
+                                updateDistanceBossBar(peeker, distance);
                                 if (distance > maxPeekDistance) {
                                     plugin.getMessages().send(peeker, "range-exceeded");
                                     endPeek(peeker);
@@ -459,6 +476,12 @@ public class PeekStateHandler {
                 task.cancel();
             }
         }
+        // 使用玩家的实体调度器确保在正确的线程上移除 BossBar
+        if (peeker.isOnline()) {
+            peeker.getScheduler().run(plugin, scheduledTask -> removeDistanceBossBar(peeker), null);
+        } else {
+            removeDistanceBossBar(peeker);
+        }
     }
 
     public void cleanup() {
@@ -467,6 +490,58 @@ public class PeekStateHandler {
                 task.cancel();
                 rangeCheckers.remove(peeker);
             });
+        }
+        // 清理所有 BossBar
+        new HashMap<>(distanceBossBars).forEach((uuid, bar) -> {
+            bar.removeAll();
+            distanceBossBars.remove(uuid);
+        });
+    }
+
+    private void createDistanceBossBar(Player peeker, Player target) {
+        removeDistanceBossBar(peeker); // 确保没有残留
+        BossBar bar = Bukkit.createBossBar(
+                String.format("§d距离 §f%s§d: §e0.0 §7/ §e%.1f §d格", target.getName(), maxPeekDistance),
+                BarColor.PINK,
+                BarStyle.SEGMENTED_10
+        );
+        bar.setProgress(0.0);
+        bar.addPlayer(peeker);
+        distanceBossBars.put(peeker.getUniqueId(), bar);
+        logDebug("Created BossBar for player %s, target: %s", peeker.getName(), target.getName());
+    }
+
+    private void updateDistanceBossBar(Player peeker, double distance) {
+        BossBar bar = distanceBossBars.get(peeker.getUniqueId());
+        if (bar == null) return;
+
+        PeekData data = activePeeks.get(peeker.getUniqueId());
+        if (data == null) return;
+
+        Player target = plugin.getServer().getPlayer(data.getTargetUUID());
+        String targetName = target != null ? target.getName() : "未知";
+
+        double progress = Math.min(distance / maxPeekDistance, 1.0);
+        bar.setProgress(progress);
+
+        // 根据距离比例改变颜色
+        if (progress < 0.5) {
+            bar.setColor(BarColor.GREEN);
+        } else if (progress < 0.75) {
+            bar.setColor(BarColor.YELLOW);
+        } else if (progress < 0.9) {
+            bar.setColor(BarColor.RED);
+        } else {
+            bar.setColor(BarColor.RED);
+        }
+
+        bar.setTitle(String.format("§d距离 §f%s§d: §e%.1f §7/ §e%.1f §d格", targetName, distance, maxPeekDistance));
+    }
+
+    private void removeDistanceBossBar(Player peeker) {
+        BossBar bar = distanceBossBars.remove(peeker.getUniqueId());
+        if (bar != null) {
+            bar.removeAll();
         }
     }
 

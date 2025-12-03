@@ -36,11 +36,20 @@ public class PeekTargetHandler {
             return false;
         }
 
-        if (plugin.getPrivacyManager().isPrivateMode(target)) {
+        // 检查隐私模式，但有 bypass 权限的玩家可以无视
+        if (plugin.getPrivacyManager().isPrivateMode(target) && !peeker.hasPermission("peek.bypass")) {
             plugin.getPrivacyManager().sendPeekRequest(peeker, target);
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * 检查是否应该静默 peek（不通知目标）
+     * 用于有 bypass 权限的玩家
+     */
+    public boolean shouldSilentPeek(Player peeker) {
+        return peeker.hasPermission("peek.bypass");
     }
 }

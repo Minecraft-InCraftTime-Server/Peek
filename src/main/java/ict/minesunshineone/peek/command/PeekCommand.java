@@ -3,6 +3,7 @@ package ict.minesunshineone.peek.command;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.bukkit.command.Command;
@@ -51,6 +52,8 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
                 handleDeny(player);
             case "self" ->
                 handleSelfPeek(player);
+            case "random", "r" ->
+                handleRandomPeek(player);
             default ->
                 handlePeek(player, args[0]);
         };
@@ -132,6 +135,51 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleRandomPeek(Player player) {
+        // 检查玩家是否已经在peek状态
+        if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
+            plugin.getMessages().send(player, "already-peeking");
+            return true;
+        }
+
+        // 检查玩家是否死亡
+        if (player.isDead()) {
+            plugin.getMessages().send(player, "cannot-peek-while-dead");
+            return true;
+        }
+
+        // 检查冷却时间
+        if (plugin.getCooldownManager().isOnCooldown(player)) {
+            plugin.getMessages().send(player, "cooldown-peek", "time",
+                    String.valueOf(plugin.getCooldownManager().getRemainingCooldown(player)));
+            return true;
+        }
+
+        // 获取所有可用的目标玩家（排除自己、私密模式玩家、死亡玩家）
+        // 注意：允许 peek 正在 peek 别人的玩家
+        List<Player> availableTargets = plugin.getServer().getOnlinePlayers().stream()
+                .filter(p -> !p.equals(player)) // 排除自己
+                .filter(p -> !plugin.getPrivacyManager().isPrivateMode(p)) // 排除私密模式玩家
+                .filter(p -> !p.isDead()) // 排除死亡玩家
+                .collect(Collectors.toList());
+
+        if (availableTargets.isEmpty()) {
+            plugin.getMessages().send(player, "no-available-random-target");
+            return true;
+        }
+
+        // 随机选择一个目标
+        Random random = new Random();
+        Player target = availableTargets.get(random.nextInt(availableTargets.size()));
+
+        // 发送随机选择提示
+        plugin.getMessages().send(player, "random-peek-selected", "player", target.getName());
+
+        // 开始 peek
+        plugin.getStateHandler().startPeek(player, target);
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!(sender instanceof Player)) {
@@ -146,6 +194,8 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             completions.add("accept");
             completions.add("deny");
             completions.add("self");
+            completions.add("random");
+            completions.add("r");
 
             if (sender.hasPermission("peek.use")) {
                 plugin.getServer().getOnlinePlayers().stream()
