@@ -35,7 +35,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            plugin.getMessages().send(player, "usage");
+            sendHelp(player);
             return true;
         }
 
@@ -178,6 +178,63 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         // 开始 peek
         plugin.getStateHandler().startPeek(player, target);
         return true;
+    }
+
+    private void sendHelp(Player player) {
+        player.sendMessage(net.kyori.adventure.text.Component.empty());
+        player.sendMessage(net.kyori.adventure.text.Component
+                .text("═══════ ", net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
+                .append(net.kyori.adventure.text.Component.text("观察指令帮助",
+                        net.kyori.adventure.text.format.NamedTextColor.GREEN,
+                        net.kyori.adventure.text.format.TextDecoration.BOLD))
+                .append(net.kyori.adventure.text.Component.text(" ═══════",
+                        net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)));
+        player.sendMessage(net.kyori.adventure.text.Component.empty());
+
+        player.sendMessage(
+                net.kyori.adventure.text.Component.text("▸ 观察功能", net.kyori.adventure.text.format.NamedTextColor.AQUA,
+                        net.kyori.adventure.text.format.TextDecoration.BOLD));
+        sendCmd(player, "/peek <玩家名>", "观察指定玩家的视角");
+        sendCmd(player, "/peek random", "随机观察一位在线玩家");
+        sendCmd(player, "/peek self", "原地peek自己");
+        sendCmd(player, "/peek exit", "退出观察模式");
+
+        player.sendMessage(net.kyori.adventure.text.Component.empty());
+        player.sendMessage(net.kyori.adventure.text.Component.text("▸ 隐私与统计",
+                net.kyori.adventure.text.format.NamedTextColor.YELLOW,
+                net.kyori.adventure.text.format.TextDecoration.BOLD));
+        sendCmd(player, "/peek privacy", "切换隐私模式");
+        sendCmd(player, "/peek accept", "接受观察请求");
+        sendCmd(player, "/peek deny", "拒绝观察请求");
+        if (player.hasPermission("peek.stats")) {
+            sendCmd(player, "/peek stats", "查看观察统计数据");
+        }
+
+        player.sendMessage(net.kyori.adventure.text.Component.empty());
+        player.sendMessage(
+                net.kyori.adventure.text.Component.text("提示: ", net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                        .append(net.kyori.adventure.text.Component.text("点击命令可快速填入聊天框",
+                                net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY,
+                                net.kyori.adventure.text.format.TextDecoration.ITALIC)));
+        player.sendMessage(net.kyori.adventure.text.Component.empty());
+    }
+
+    private void sendCmd(Player player, String cmd, String desc) {
+        net.kyori.adventure.text.Component cmdComponent = net.kyori.adventure.text.Component
+                .text("  " + cmd, net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                        net.kyori.adventure.text.Component
+                                .text(desc, net.kyori.adventure.text.format.NamedTextColor.WHITE)
+                                .append(net.kyori.adventure.text.Component.newline())
+                                .append(net.kyori.adventure.text.Component.text("点击填入命令",
+                                        net.kyori.adventure.text.format.NamedTextColor.GRAY,
+                                        net.kyori.adventure.text.format.TextDecoration.ITALIC))))
+                .clickEvent(net.kyori.adventure.text.event.ClickEvent.suggestCommand(cmd.split("<")[0].trim() + " "));
+
+        net.kyori.adventure.text.Component descComponent = net.kyori.adventure.text.Component.text(" - " + desc,
+                net.kyori.adventure.text.format.NamedTextColor.GRAY);
+
+        player.sendMessage(cmdComponent.append(descComponent));
     }
 
     @Override

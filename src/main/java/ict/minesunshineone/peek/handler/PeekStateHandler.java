@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
+import ict.minesunshineone.peek.util.PlayerStateUtil;
 
 /**
  * 核心 Peek 状态管理器
@@ -22,7 +23,7 @@ public class PeekStateHandler {
 
     private final PeekPlugin plugin;
     private final Map<UUID, PeekData> activePeeks = new HashMap<>();
-    
+
     // 委托的处理器
     private final BossBarHandler bossBarHandler;
     private final RangeChecker rangeChecker;
@@ -66,8 +67,7 @@ public class PeekStateHandler {
                     peeker.getHealth(),
                     peeker.getFoodLevel(),
                     peeker.getSaturation(),
-                    peeker.getActivePotionEffects()
-            );
+                    peeker.getActivePotionEffects());
 
             activePeeks.put(peeker.getUniqueId(), data);
             plugin.getStateManager().savePlayerState(peeker, data);
@@ -81,7 +81,7 @@ public class PeekStateHandler {
 
         // 发送消息给观察者
         plugin.getMessages().send(peeker, "peek-start", "player", target.getName());
-        
+
         // 只有非静默模式才通知目标
         if (!silentPeek) {
             plugin.getMessages().send(target, "being-peeked", "player", peeker.getName());
@@ -120,10 +120,10 @@ public class PeekStateHandler {
 
             try {
                 logDebug("Starting self peek: %s", peeker.getName());
-                
+
                 // 保存当前位置作为原始位置
                 Location originalLocation = peeker.getLocation().clone();
-                
+
                 // 创建特殊的 PeekData，目标设为自己
                 PeekData data = new PeekData(
                         originalLocation,
@@ -133,8 +133,7 @@ public class PeekStateHandler {
                         peeker.getHealth(),
                         peeker.getFoodLevel(),
                         peeker.getSaturation(),
-                        peeker.getActivePotionEffects()
-                );
+                        peeker.getActivePotionEffects());
 
                 activePeeks.put(peeker.getUniqueId(), data);
                 plugin.getStateManager().savePlayerState(peeker, data);
@@ -142,7 +141,7 @@ public class PeekStateHandler {
 
                 // 设置为观察者模式但不传送
                 setSelfPeekGameMode(peeker);
-                
+
                 // 发送消息
                 plugin.getMessages().send(peeker, "self-peek-start");
 
@@ -153,15 +152,16 @@ public class PeekStateHandler {
                 // 创建 BossBar 并启动自我观察距离检查器
                 bossBarHandler.createSelfPeekBossBar(peeker, plugin.getMessages().get("self-peek-origin", "原点"));
                 startSelfRangeChecker(peeker, originalLocation);
-                
+
                 logDebug("Self peek started successfully for player: %s", peeker.getName());
-                
+
             } catch (Exception e) {
-                plugin.getLogger().warning(String.format("启动自我观察时发生错误，玩家: %s，错误: %s", peeker.getName(), e.getMessage()));
+                plugin.getLogger()
+                        .warning(String.format("启动自我观察时发生错误，玩家: %s，错误: %s", peeker.getName(), e.getMessage()));
                 if (plugin.getConfig().getBoolean("debug", false)) {
                     e.printStackTrace();
                 }
-                
+
                 // 清理可能的残留状态
                 activePeeks.remove(peeker.getUniqueId());
                 // 通知玩家发生错误
@@ -220,11 +220,11 @@ public class PeekStateHandler {
             if (peeker.isOnline()) {
                 plugin.getMessages().send(peeker, "peek-end");
             }
-            
+
             // 检查是否是自我观察模式
             boolean isSelfPeek = target != null && target.getUniqueId().equals(peeker.getUniqueId());
             boolean silentPeek = peeker.isOnline() && plugin.getTargetHandler().shouldSilentPeek(peeker);
-            
+
             // 非自我观察且非静默模式才通知目标
             if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
                 plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
@@ -249,23 +249,13 @@ public class PeekStateHandler {
         // 先切换游戏模式
         plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
             try {
-                // 如果玩家在睡觉，先让他离开床
-                if (peeker.isSleeping()) {
-                    peeker.wakeup(false);
-                }
-
-                // 传送之前先设置为蹲下
-                peeker.setSneaking(true);
-
-                // 如果玩家在附身状态，先退出附身
-                if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
-                    peeker.setSpectatorTarget(null);
-                }
+                // 清理骑乘状态，准备进入旁观者模式
+                PlayerStateUtil.prepareForSpectatorMode(peeker, plugin.getLogger());
 
                 // 设置为旁观模式
                 peeker.setGameMode(GameMode.SPECTATOR);
 
-                // 等待1 tick后再传送
+                // 等待2 tick后再传送
                 plugin.getServer().getRegionScheduler().runDelayed(plugin, peeker.getLocation(), delayedTask -> {
                     peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                         if (!success) {
@@ -282,6 +272,7 @@ public class PeekStateHandler {
                 }, 2L); // 2 tick 延迟
             } catch (Exception e) {
                 plugin.getLogger().warning(String.format("为玩家 %s 切换游戏模式时发生错误", peeker.getName()));
+                peeker.setSneaking(false); // 确保异常时也恢复状态
                 endPeek(peeker);
             }
         });
@@ -303,22 +294,18 @@ public class PeekStateHandler {
                     return;
                 }
 
-                if (peeker.isSleeping()) {
-                    peeker.wakeup(false);
-                }
-
-                if (peeker.getGameMode() == GameMode.SPECTATOR && peeker.getSpectatorTarget() != null) {
-                    peeker.setSpectatorTarget(null);
-                }
+                // 清理骑乘状态，准备进入旁观者模式
+                PlayerStateUtil.prepareForSpectatorMode(peeker, plugin.getLogger());
 
                 peeker.setGameMode(GameMode.SPECTATOR);
-                
+
                 logDebug("Successfully set self peek game mode for player: %s", peeker.getName());
             } catch (Exception e) {
                 plugin.getLogger().warning(String.format("为玩家 %s 设置自我观察模式时发生错误: %s", peeker.getName(), e.getMessage()));
                 if (plugin.getConfig().getBoolean("debug", false)) {
                     e.printStackTrace();
                 }
+                peeker.setSneaking(false); // 确保异常时也恢复状态
                 endPeek(peeker);
             }
         });
@@ -326,46 +313,44 @@ public class PeekStateHandler {
 
     private void startNormalRangeChecker(Player peeker, Player target) {
         rangeChecker.startRangeChecker(peeker, target,
-            // 超出范围时
-            () -> {
-                plugin.getMessages().send(peeker, "range-exceeded");
-                endPeek(peeker);
-            },
-            // 目标离线时
-            () -> endPeek(peeker),
-            // 距离更新时
-            (distance) -> {
-                PeekData data = activePeeks.get(peeker.getUniqueId());
-                bossBarHandler.updateDistanceBossBar(peeker, distance, data);
-            },
-            // 不同世界时
-            () -> {
-                plugin.getMessages().send(peeker, "target-in-different-world");
-                teleportAndSetGameMode(peeker, target);
-            }
-        );
+                // 超出范围时
+                () -> {
+                    plugin.getMessages().send(peeker, "range-exceeded");
+                    endPeek(peeker);
+                },
+                // 目标离线时
+                () -> endPeek(peeker),
+                // 距离更新时
+                (distance) -> {
+                    PeekData data = activePeeks.get(peeker.getUniqueId());
+                    bossBarHandler.updateDistanceBossBar(peeker, distance, data);
+                },
+                // 不同世界时
+                () -> {
+                    plugin.getMessages().send(peeker, "target-in-different-world");
+                    teleportAndSetGameMode(peeker, target);
+                });
     }
 
     private void startSelfRangeChecker(Player peeker, Location originalLocation) {
         String selfPeekLabel = plugin.getMessages().get("self-peek-origin", "原点");
         rangeChecker.startSelfRangeChecker(peeker, originalLocation,
-            // 获取 Peek 数据
-            () -> activePeeks.get(peeker.getUniqueId()),
-            // 超出自我观察范围时
-            () -> {
-                plugin.getMessages().send(peeker, "self-peek-range-exceeded");
-                endPeek(peeker);
-            },
-            // 世界改变时
-            () -> {
-                plugin.getMessages().send(peeker, "self-peek-world-changed");
-                endPeek(peeker);
-            },
-            // 距离更新时（用于更新 BossBar）
-            (distance) -> bossBarHandler.updateDistanceBossBar(peeker, distance, selfPeekLabel),
-            // 发生错误时
-            () -> endPeek(peeker)
-        );
+                // 获取 Peek 数据
+                () -> activePeeks.get(peeker.getUniqueId()),
+                // 超出自我观察范围时
+                () -> {
+                    plugin.getMessages().send(peeker, "self-peek-range-exceeded");
+                    endPeek(peeker);
+                },
+                // 世界改变时
+                () -> {
+                    plugin.getMessages().send(peeker, "self-peek-world-changed");
+                    endPeek(peeker);
+                },
+                // 距离更新时（用于更新 BossBar）
+                (distance) -> bossBarHandler.updateDistanceBossBar(peeker, distance, selfPeekLabel),
+                // 发生错误时
+                () -> endPeek(peeker));
     }
 
     private void stopRangeCheckerAndBossBar(Player peeker) {
