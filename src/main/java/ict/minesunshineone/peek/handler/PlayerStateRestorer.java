@@ -16,6 +16,7 @@ import ict.minesunshineone.peek.util.PlayerStateUtil;
  * 包括传送、游戏模式、生命值、饥饿度、药水效果等
  */
 public class PlayerStateRestorer {
+    private static final Vector ZERO_VECTOR = new Vector(0, 0, 0);
 
     private final PeekPlugin plugin;
 
@@ -30,25 +31,29 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void restorePlayerState(Player peeker, PeekData data) {
-        plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), task -> {
+        final Runnable onFailed = () -> handleTeleportFailure(peeker, data);
+
+        final boolean scheduled = peeker.getScheduler().execute(plugin, ()-> {
 
             // 强制清理任何骑乘/附身状态，防止卡在旁观者模式
-            PlayerStateUtil.forceExitRidingState(peeker, plugin.getLogger());
+            PlayerStateUtil.forceExitRidingState(peeker);
 
             // 在传送前先清除动量
-            peeker.setVelocity(new Vector(0, 0, 0));
+            peeker.setVelocity(ZERO_VECTOR);
 
             peeker.teleportAsync(data.getOriginalLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                 if (success) {
                     // 传送成功后再改变游戏模式
-                    plugin.getServer().getRegionScheduler().run(plugin, data.getOriginalLocation(), modeTask -> {
-                        applyRestoredState(peeker, data);
-                    });
+                    applyRestoredState(peeker, data);
                 } else {
-                    handleTeleportFailure(peeker, data);
+                    onFailed.run();
                 }
             });
-        });
+        }, onFailed, 1L);
+
+        if (!scheduled) {
+            onFailed.run();
+        }
     }
 
     /**
@@ -62,28 +67,31 @@ public class PlayerStateRestorer {
                 "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
                 peeker.getName()));
 
-        Location spawnLoc = resolveSpawnLocation(peeker);
+        final Location spawnLoc = resolveSpawnLocation(peeker);
 
-        if (spawnLoc != null) {
-            plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, spawnTask -> {
-                peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
-                    if (spawnSuccess) {
-                        plugin.getServer().getRegionScheduler().run(plugin, spawnLoc, modeTask -> {
-                            applyRestoredState(peeker, data);
-                        });
-                    } else {
-                        plugin.getLogger().severe(String.format(
-                                "无法将玩家 %s 传送到任何安全位置",
-                                peeker.getName()));
-                        forceStateRestoreWithoutTeleport(peeker, data);
-                    }
-                });
-            });
-        } else {
+        final Runnable onFailed = () -> {
             plugin.getLogger().severe(String.format(
                     "未找到可用的重生点，强制恢复玩家 %s 的状态",
                     peeker.getName()));
             forceStateRestoreWithoutTeleport(peeker, data);
+        };
+
+        if (spawnLoc != null) {
+            final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
+                peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
+                    if (spawnSuccess) {
+                        applyRestoredState(peeker, data);
+                    } else {
+                        onFailed.run();
+                    }
+                });
+            }, onFailed, 1L);
+
+            if (!scheduled) {
+                onFailed.run();
+            }
+        } else {
+            onFailed.run();
         }
 
         plugin.getMessages().send(peeker, "teleport-failed");
@@ -97,17 +105,13 @@ public class PlayerStateRestorer {
      */
     public Location resolveSpawnLocation(Player peeker) {
         Location respawnLocation = peeker.getRespawnLocation();
+
         if (respawnLocation != null) {
             return respawnLocation;
         }
 
-        if (peeker.getWorld() != null) {
-            return peeker.getWorld().getSpawnLocation();
-        }
+        return peeker.getWorld().getSpawnLocation();
 
-        return plugin.getServer().getWorlds().isEmpty()
-                ? null
-                : plugin.getServer().getWorlds().get(0).getSpawnLocation();
     }
 
     /**
@@ -117,9 +121,7 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void forceStateRestoreWithoutTeleport(Player peeker, PeekData data) {
-        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), modeTask -> {
-            applyRestoredState(peeker, data);
-        });
+        applyRestoredState(peeker, data);
     }
 
     /**
@@ -133,7 +135,7 @@ public class PlayerStateRestorer {
         peeker.setVelocity(new Vector(0, 0, 0));
 
         // 再次强制清理骑乘/附身状态，确保万无一失
-        PlayerStateUtil.forceExitRidingState(peeker, plugin.getLogger());
+        PlayerStateUtil.forceExitRidingState(peeker);
 
         peeker.setGameMode(data.getOriginalGameMode());
         double maxHealth = getMaxHealth(peeker);

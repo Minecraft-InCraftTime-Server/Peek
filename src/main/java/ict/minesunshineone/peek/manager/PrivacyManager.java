@@ -136,7 +136,7 @@ public class PrivacyManager {
     /**
      * 取消玩家的所有待处理请求
      */
-    private void cancelAllPendingRequests(Player player) {
+    private synchronized void cancelAllPendingRequests(Player player) {
         UUID playerUuid = player.getUniqueId();
         
         // 取消作为目标的所有请求
@@ -201,8 +201,7 @@ public class PrivacyManager {
         playSound(target, "privacy.sounds.request");
 
         // 设置超时任务
-        ScheduledTask timeoutTask = plugin.getServer().getRegionScheduler().runDelayed(plugin,
-                target.getLocation(),
+        ScheduledTask timeoutTask = plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin,
                 task -> {
                     if (removePendingRequest(peeker, target)) {
                         plugin.getMessages().send(peeker, "request-timeout");
@@ -213,8 +212,10 @@ public class PrivacyManager {
                 requestTimeout * 20L);
 
         // 保存请求
-        pendingRequests.computeIfAbsent(targetUuid, k -> new HashMap<>())
-                .put(peekerUuid, timeoutTask);
+        synchronized (this) {
+            pendingRequests.computeIfAbsent(targetUuid, k -> new HashMap<>())
+                    .put(peekerUuid, timeoutTask);
+        }
     }
 
     public void handleRequestResponse(Player target, Player peeker, boolean accepted) {
@@ -235,12 +236,12 @@ public class PrivacyManager {
         }
     }
 
-    private boolean hasPendingRequest(Player peeker, Player target) {
+    private synchronized boolean hasPendingRequest(Player peeker, Player target) {
         Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(target.getUniqueId());
         return targetRequests != null && targetRequests.containsKey(peeker.getUniqueId());
     }
 
-    public boolean removePendingRequest(Player peeker, Player target) {
+    public synchronized boolean removePendingRequest(Player peeker, Player target) {
         Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(target.getUniqueId());
         if (targetRequests != null) {
             ScheduledTask task = targetRequests.remove(peeker.getUniqueId());
@@ -255,14 +256,14 @@ public class PrivacyManager {
         return false;
     }
 
-    private void setRequestCooldown(Player peeker, Player target) {
+    private synchronized void setRequestCooldown(Player peeker, Player target) {
         if (cooldownEnabled) {
             String key = getCooldownKey(peeker.getUniqueId(), target.getUniqueId());
             requestCooldowns.put(key, System.currentTimeMillis());
         }
     }
 
-    private boolean isOnRequestCooldown(Player peeker, Player target) {
+    private synchronized boolean isOnRequestCooldown(Player peeker, Player target) {
         if (!cooldownEnabled || peeker.hasPermission("peek.nocooldown")) {
             return false;
         }
@@ -276,7 +277,7 @@ public class PrivacyManager {
         return System.currentTimeMillis() - lastRequest < cooldownDuration * 1000L;
     }
 
-    private int getRemainingRequestCooldown(Player peeker, Player target) {
+    private synchronized int getRemainingRequestCooldown(Player peeker, Player target) {
         if (!cooldownEnabled || peeker.hasPermission("peek.nocooldown")) {
             return 0;
         }
@@ -307,7 +308,7 @@ public class PrivacyManager {
         }
     }
 
-    public void cancelAllRequests(Player player) {
+    public synchronized void cancelAllRequests(Player player) {
         UUID playerUuid = player.getUniqueId();
 
         // 取消作为目标的请求
@@ -328,7 +329,7 @@ public class PrivacyManager {
         pendingRequests.values().removeIf(Map::isEmpty);
     }
 
-    public void handleAccept(Player player) {
+    public synchronized void handleAccept(Player player) {
         // 获取最近的请求者
         UUID playerUuid = player.getUniqueId();
         Map<UUID, ScheduledTask> requests = pendingRequests.get(playerUuid);
@@ -349,7 +350,7 @@ public class PrivacyManager {
         handleRequestResponse(player, peeker, true);
     }
 
-    public void handleDeny(Player player) {
+    public synchronized void handleDeny(Player player) {
         // 获取最近的请求者
         UUID playerUuid = player.getUniqueId();
         Map<UUID, ScheduledTask> requests = pendingRequests.get(playerUuid);
@@ -369,7 +370,7 @@ public class PrivacyManager {
         }
     }
 
-    public Map<UUID, Map<UUID, ScheduledTask>> getPendingRequests() {
-        return pendingRequests;
+    public synchronized Map<UUID, Map<UUID, ScheduledTask>> getPendingRequests() {
+        return new HashMap<>(pendingRequests); // TODO 好罢这玩意我也不想重构，先用COW顶着罢()
     }
 }

@@ -3,6 +3,7 @@ package ict.minesunshineone.peek.manager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.entity.Player;
 
@@ -10,7 +11,7 @@ import ict.minesunshineone.peek.PeekPlugin;
 
 public class CooldownManager {
 
-    private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
     private final int cooldownDuration;
 
     public CooldownManager(PeekPlugin plugin) {

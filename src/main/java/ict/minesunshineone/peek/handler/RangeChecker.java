@@ -1,6 +1,7 @@
 package ict.minesunshineone.peek.handler;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -20,7 +21,6 @@ public class RangeChecker {
 
     private final PeekPlugin plugin;
     private final Map<UUID, ScheduledTask> rangeCheckers = new HashMap<>();
-    private final Object rangeCheckersLock = new Object();
     private final double maxPeekDistance;
 
     public RangeChecker(PeekPlugin plugin) {
@@ -42,45 +42,50 @@ public class RangeChecker {
                                    Runnable onTargetOffline,
                                    Consumer<Double> onDistanceUpdate,
                                    Runnable onDifferentWorld) {
-        synchronized (rangeCheckersLock) {
+        synchronized (this) {
             // 先停止已有的检查器（如果有的话）
             ScheduledTask existingTask = rangeCheckers.remove(peeker.getUniqueId());
             if (existingTask != null) {
                 existingTask.cancel();
             }
 
-            ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                    target.getLocation(), // 使用target的位置而不是peeker的位置
+            ScheduledTask task = target.getScheduler().runAtFixedRate(plugin,
                     scheduledTask -> {
-                        if (!target.isOnline()) {
-                            onTargetOffline.run();
+                        // 检查观察者是否死亡
+                        if (peeker.isDead()) {
                             return;
                         }
 
-                        try {
-                            // 检查观察者是否死亡
-                            if (peeker.isDead()) {
-                                return;
+                        if (peeker.getWorld().equals(target.getWorld())) {
+                            double distance = peeker.getLocation().distance(target.getLocation());
+                            onDistanceUpdate.accept(distance);
+                            if (distance > maxPeekDistance) {
+                                onRangeExceeded.run();
                             }
+                        } else {
+                            // 跨维度
+                            onDifferentWorld.run();
+                        }
+                    },
+                    () -> {
+                        // 实体调度器退役 -> 目标已经离线或者切换回了配置状态
+                        onTargetOffline.run();
 
-                            if (peeker.getWorld().equals(target.getWorld())) {
-                                double distance = peeker.getLocation().distance(target.getLocation());
-                                onDistanceUpdate.accept(distance);
-                                if (distance > maxPeekDistance) {
-                                    onRangeExceeded.run();
-                                }
-                            } else {
-                                // 跨维度
-                                onDifferentWorld.run();
-                            }
-                        } catch (Exception e) {
-                            plugin.getLogger().warning(String.format("距离检查时发生错误：%s", e.getMessage()));
-                            onRangeExceeded.run();
+                        // 清理
+                        synchronized (RangeChecker.this) {
+                            rangeCheckers.remove(peeker.getUniqueId());
                         }
                     },
                     1L, 10L);
 
-            rangeCheckers.put(peeker.getUniqueId(), task);
+            // 实体调度器没有退役，正常添加到任务列表中
+            if (task != null) {
+                rangeCheckers.put(peeker.getUniqueId(), task);
+                return;
+            }
+
+            // 实体调度器退役 -> 目标已经离线或者切换回了配置状态
+            onTargetOffline.run();
         }
     }
 
@@ -100,59 +105,53 @@ public class RangeChecker {
                                        Runnable onWorldChanged,
                                        java.util.function.Consumer<Double> onDistanceUpdate,
                                        Runnable onError) {
-        synchronized (rangeCheckersLock) {
+        synchronized (this) {
             // 先停止已有的检查器（如果有的话）
             stopRangeChecker(peeker);
 
-            ScheduledTask task = plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                    originalLocation, // 使用原始位置
+            ScheduledTask task = peeker.getScheduler().runAtFixedRate(plugin,
                     scheduledTask -> {
-                        // 检查玩家是否在线
-                        if (!peeker.isOnline()) {
-                            logDebug("Player %s went offline during self peek, ending peek", peeker.getName());
-                            onError.run();
+                        // 检查观察者是否死亡（与普通peek逻辑一致）
+                        if (peeker.isDead()) {
+                            logDebug("Player %s died during self peek, but continuing to monitor for respawn", peeker.getName());
+                            return; // 不立即结束，等待重生处理
+                        }
+
+                        // 额外的状态检查
+                        PeekData data = getPeekData.get();
+                        if (data == null) {
+                            logDebug("PeekData for player %s is null, stopping range checker", peeker.getName());
+                            scheduledTask.cancel();
                             return;
                         }
 
-                        try {
-                            // 检查观察者是否死亡（与普通peek逻辑一致）
-                            if (peeker.isDead()) {
-                                logDebug("Player %s died during self peek, but continuing to monitor for respawn", peeker.getName());
-                                return; // 不立即结束，等待重生处理
+                        // 检查是否超出距离限制（相对于原始位置）
+                        if (peeker.getWorld().equals(originalLocation.getWorld())) {
+                            double distance = peeker.getLocation().distance(originalLocation);
+                            // 更新距离显示
+                            onDistanceUpdate.accept(distance);
+                            if (distance > maxPeekDistance) {
+                                logDebug("Player %s exceeded self peek distance: %.2f > %.2f",
+                                        peeker.getName(), distance, maxPeekDistance);
+                                onRangeExceeded.run();
                             }
-
-                            // 额外的状态检查
-                            PeekData data = getPeekData.get();
-                            if (data == null) {
-                                logDebug("PeekData for player %s is null, stopping range checker", peeker.getName());
-                                scheduledTask.cancel();
-                                return;
-                            }
-
-                            // 检查是否超出距离限制（相对于原始位置）
-                            if (peeker.getWorld().equals(originalLocation.getWorld())) {
-                                double distance = peeker.getLocation().distance(originalLocation);
-                                // 更新距离显示
-                                onDistanceUpdate.accept(distance);
-                                if (distance > maxPeekDistance) {
-                                    logDebug("Player %s exceeded self peek distance: %.2f > %.2f", 
-                                            peeker.getName(), distance, maxPeekDistance);
-                                    onRangeExceeded.run();
-                                }
-                            } else {
-                                // 如果换了世界，自动结束自我观察
-                                logDebug("Player %s changed world during self peek", peeker.getName());
-                                onWorldChanged.run();
-                            }
-                        } catch (Exception e) {
-                            plugin.getLogger().warning(String.format("自我观察距离检查时发生错误：%s", e.getMessage()));
-                            if (plugin.getConfig().getBoolean("debug", false)) {
-                                e.printStackTrace();
-                            }
-                            onError.run();
+                        } else {
+                            // 如果换了世界，自动结束自我观察
+                            logDebug("Player %s changed world during self peek", peeker.getName());
+                            onWorldChanged.run();
                         }
                     },
+                    () -> {
+                        logDebug("Player %s went offline during self peek, ending peek", peeker.getName());
+                        onError.run();
+                    },
                     1L, 10L);
+
+            if (task == null) {
+                logDebug("Player %s went offline during self peek, ending peek", peeker.getName());
+                onError.run();
+                return;
+            }
 
             rangeCheckers.put(peeker.getUniqueId(), task);
             logDebug("Started self range checker for player: %s", peeker.getName());
@@ -164,8 +163,9 @@ public class RangeChecker {
      * @param peeker 观察者
      */
     public void stopRangeChecker(Player peeker) {
-        synchronized (rangeCheckersLock) {
+        synchronized (this) {
             ScheduledTask task = rangeCheckers.remove(peeker.getUniqueId());
+
             if (task != null) {
                 task.cancel();
             }
@@ -184,11 +184,17 @@ public class RangeChecker {
      * 清理所有检查器
      */
     public void cleanup() {
-        synchronized (rangeCheckersLock) {
-            new HashMap<>(rangeCheckers).forEach((peeker, task) -> {
+        synchronized (this) {
+            final Iterator<Map.Entry<UUID, ScheduledTask>> checkerEntryIterator = rangeCheckers.entrySet().iterator();
+
+            while (checkerEntryIterator.hasNext()) {
+                final Map.Entry<UUID, ScheduledTask> entry = checkerEntryIterator.next();
+
+                final ScheduledTask task = entry.getValue();
                 task.cancel();
-                rangeCheckers.remove(peeker);
-            });
+
+                checkerEntryIterator.remove();
+            }
         }
     }
 
