@@ -52,6 +52,7 @@ public class PeekStateHandler {
         }
 
         // 防止并发修改
+        final PeekData data;
         synchronized (activePeeks) {
             if (activePeeks.containsKey(peeker.getUniqueId())) {
                 plugin.getMessages().send(peeker, "already-peeking");
@@ -59,7 +60,7 @@ public class PeekStateHandler {
             }
 
             logDebug("Starting peek: %s -> %s", peeker.getName(), target.getName());
-            PeekData data = new PeekData(
+            data = new PeekData(
                     peeker.getLocation().clone(),
                     peeker.getGameMode(),
                     target.getUniqueId(),
@@ -70,11 +71,12 @@ public class PeekStateHandler {
                     peeker.getActivePotionEffects());
 
             activePeeks.put(peeker.getUniqueId(), data);
-            plugin.getStateManager().savePlayerState(peeker, data);
-            plugin.getStatisticsManager().recordPeekStart(peeker, target);
-
-            teleportAndSetGameMode(peeker, target);
         }
+
+        plugin.getStateManager().savePlayerState(peeker, data);
+        plugin.getStatisticsManager().recordPeekStart(peeker, target);
+
+        teleportAndSetGameMode(peeker, target);
 
         // 检查是否静默 peek（有 bypass 权限）
         boolean silentPeek = plugin.getTargetHandler().shouldSilentPeek(peeker);
@@ -246,69 +248,68 @@ public class PeekStateHandler {
     // ==================== 私有方法 ====================
 
     private void teleportAndSetGameMode(Player peeker, Player target) {
+        final Runnable onFailed = () -> {
+            plugin.getMessages().send(peeker, "teleport-failed");
+            endPeek(peeker);
+        };
+
         // 先切换游戏模式
-        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
-            try {
-                // 清理骑乘状态，准备进入旁观者模式
-                PlayerStateUtil.prepareForSpectatorMode(peeker, plugin.getLogger());
+        final boolean firstRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+            // 清理骑乘状态，准备进入旁观者模式
+            PlayerStateUtil.prepareForSpectatorMode(peeker);
 
-                // 设置为旁观模式
-                peeker.setGameMode(GameMode.SPECTATOR);
+            // 设置为旁观模式
+            peeker.setGameMode(GameMode.SPECTATOR);
 
-                // 等待2 tick后再传送
-                plugin.getServer().getRegionScheduler().runDelayed(plugin, peeker.getLocation(), delayedTask -> {
-                    peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
-                        if (!success) {
-                            plugin.getMessages().send(peeker, "teleport-failed");
-                            endPeek(peeker);
-                        } else {
-                            // 传送成功后，使用玩家的实体调度器确保在正确线程执行
-                            peeker.getScheduler().run(plugin, scheduledTask -> {
-                                bossBarHandler.createDistanceBossBar(peeker, target);
-                                startNormalRangeChecker(peeker, target);
-                            }, null);
-                        }
-                    });
-                }, 2L); // 2 tick 延迟
-            } catch (Exception e) {
-                plugin.getLogger().warning(String.format("为玩家 %s 切换游戏模式时发生错误", peeker.getName()));
-                peeker.setSneaking(false); // 确保异常时也恢复状态
-                endPeek(peeker);
+            // 等待2 tick后再传送
+            final boolean secondRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+                peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
+                    if (!success) {
+                        onFailed.run();
+                    } else {
+                        // 传送成功后，使用玩家的实体调度器确保在正确线程执行
+                        bossBarHandler.createDistanceBossBar(peeker, target);
+                        startNormalRangeChecker(peeker, target);
+                    }
+                });
+            }, onFailed, 2L); // 2 tick 延迟
+
+            if (!secondRoundScheduled) {
+                onFailed.run();
             }
-        });
+        }, onFailed, 1L);
+
+        if (!firstRoundScheduled) {
+            onFailed.run();
+        }
     }
 
     private void setSelfPeekGameMode(Player peeker) {
-        plugin.getServer().getRegionScheduler().run(plugin, peeker.getLocation(), task -> {
-            try {
-                if (!peeker.isOnline()) {
-                    plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线", peeker.getName()));
-                    endPeek(peeker, false);
-                    return;
-                }
+        peeker.getScheduler().execute(plugin, () -> {
+            // 这里如果玩家离线了调度器会自动退役
+            /*if (!peeker.isOnline()) {
+                plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线", peeker.getName()));
+                endPeek(peeker, false);
+                return;
+            }*/
 
-                if (peeker.isDead()) {
-                    plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已死亡", peeker.getName()));
-                    plugin.getMessages().send(peeker, "cannot-peek-while-dead");
-                    endPeek(peeker, false);
-                    return;
-                }
-
-                // 清理骑乘状态，准备进入旁观者模式
-                PlayerStateUtil.prepareForSpectatorMode(peeker, plugin.getLogger());
-
-                peeker.setGameMode(GameMode.SPECTATOR);
-
-                logDebug("Successfully set self peek game mode for player: %s", peeker.getName());
-            } catch (Exception e) {
-                plugin.getLogger().warning(String.format("为玩家 %s 设置自我观察模式时发生错误: %s", peeker.getName(), e.getMessage()));
-                if (plugin.getConfig().getBoolean("debug", false)) {
-                    e.printStackTrace();
-                }
-                peeker.setSneaking(false); // 确保异常时也恢复状态
-                endPeek(peeker);
+            if (peeker.isDead()) {
+                plugin.getSLF4JLogger().warn("玩家 {} 在设置自我观察模式时已死亡", peeker.getName());
+                plugin.getMessages().send(peeker, "cannot-peek-while-dead");
+                endPeek(peeker, false);
+                return;
             }
-        });
+
+            // 清理骑乘状态，准备进入旁观者模式
+            PlayerStateUtil.prepareForSpectatorMode(peeker);
+
+            peeker.setGameMode(GameMode.SPECTATOR);
+
+            logDebug("Successfully set self peek game mode for player: %s", peeker.getName());
+        }, () -> {
+            plugin.getSLF4JLogger().warn("玩家 {} 在设置自我观察模式时已离线", peeker.getName());
+            endPeek(peeker, false);
+        }, 1L);
     }
 
     private void startNormalRangeChecker(Player peeker, Player target) {

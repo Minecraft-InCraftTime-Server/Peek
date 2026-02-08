@@ -93,7 +93,7 @@ public class PeekListener implements Listener {
 
         // 如果玩家死亡时有发出的请求，取消所有请求
         for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry
-                : new HashMap<>(plugin.getPrivacyManager().getPendingRequests()).entrySet()) {
+                : plugin.getPrivacyManager().getPendingRequests().entrySet()) {
             Map<UUID, ScheduledTask> requests = entry.getValue();
             if (requests.containsKey(player.getUniqueId())) {
                 // 取消该玩家发出的请求
