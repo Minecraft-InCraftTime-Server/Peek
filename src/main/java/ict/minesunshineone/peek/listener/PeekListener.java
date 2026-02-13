@@ -44,7 +44,7 @@ public class PeekListener implements Listener {
         for (Map.Entry<UUID, PeekData> entry : new HashMap<>(plugin.getStateHandler().getActivePeeks()).entrySet()) {
             UUID peekerUUID = entry.getKey();
             UUID targetUUID = entry.getValue().getTargetUUID();
-            
+
             // 如果被观察者下线了，且不是自我观察
             if (player.getUniqueId().equals(targetUUID) && !peekerUUID.equals(targetUUID)) {
                 Player peeker = plugin.getServer().getPlayer(peekerUUID);
@@ -65,15 +65,9 @@ public class PeekListener implements Listener {
         // 检查是否有未恢复的状态
         PeekData savedState = plugin.getStateManager().getPlayerState(player);
         if (savedState != null) {
-            // 启动一个循环任务检查玩家是否还在死亡状态
-            plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                    player.getLocation(),
+            // 使用玩家实体调度器，避免 RegionScheduler 坐标过时问题
+            player.getScheduler().runAtFixedRate(plugin,
                     task -> {
-                        if (!player.isOnline()) {
-                            task.cancel();
-                            return;
-                        }
-
                         if (!player.isDead()) {
                             task.cancel();
                             // 直接恢复状态
@@ -83,6 +77,8 @@ public class PeekListener implements Listener {
                             plugin.getMessages().send(player, "peek-end-offline");
                         }
                     },
+                    () -> plugin.getLogger().info(
+                            String.format("玩家 %s 在恢复 Peek 状态前离线", player.getName())),
                     1L, 20L); // 每秒检查一次
         }
     }
@@ -92,8 +88,8 @@ public class PeekListener implements Listener {
         Player player = event.getPlayer();
 
         // 如果玩家死亡时有发出的请求，取消所有请求
-        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry
-                : plugin.getPrivacyManager().getPendingRequests().entrySet()) {
+        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry : plugin.getPrivacyManager().getPendingRequests()
+                .entrySet()) {
             Map<UUID, ScheduledTask> requests = entry.getValue();
             if (requests.containsKey(player.getUniqueId())) {
                 // 取消该玩家发出的请求

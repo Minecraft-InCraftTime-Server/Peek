@@ -21,7 +21,7 @@ public class BossBarHandler {
 
     private final PeekPlugin plugin;
     private final Map<UUID, BossBar> distanceBossBars = new HashMap<>();
-    
+
     // BossBar 配置
     private final boolean enabled;
     private final String titleFormat;
@@ -36,10 +36,11 @@ public class BossBarHandler {
     public BossBarHandler(PeekPlugin plugin) {
         this.plugin = plugin;
         this.maxPeekDistance = plugin.getConfig().getDouble("limits.max-peek-distance", 50.0);
-        
+
         // 加载 BossBar 配置
         this.enabled = plugin.getConfig().getBoolean("bossbar.enabled", true);
-        this.titleFormat = plugin.getConfig().getString("bossbar.title", "&d距离 &f{target}&d: &e{distance} &7/ &e{max_distance} &d格");
+        this.titleFormat = plugin.getConfig().getString("bossbar.title",
+                "&d距离 &f{target}&d: &e{distance} &7/ &e{max_distance} &d格");
         this.style = parseBarStyle(plugin.getConfig().getString("bossbar.style", "SEGMENTED_10"));
         this.colorSafe = parseBarColor(plugin.getConfig().getString("bossbar.colors.safe", "GREEN"));
         this.colorWarning = parseBarColor(plugin.getConfig().getString("bossbar.colors.warning", "YELLOW"));
@@ -47,7 +48,7 @@ public class BossBarHandler {
         this.thresholdWarning = plugin.getConfig().getDouble("bossbar.thresholds.warning", 0.5);
         this.thresholdDanger = plugin.getConfig().getDouble("bossbar.thresholds.danger", 0.75);
     }
-    
+
     private BarStyle parseBarStyle(String style) {
         try {
             return BarStyle.valueOf(style.toUpperCase());
@@ -56,7 +57,7 @@ public class BossBarHandler {
             return BarStyle.SEGMENTED_10;
         }
     }
-    
+
     private BarColor parseBarColor(String color) {
         try {
             return BarColor.valueOf(color.toUpperCase());
@@ -68,20 +69,21 @@ public class BossBarHandler {
 
     /**
      * 为观察者创建距离显示 BossBar
+     * 
      * @param peeker 观察者
      * @param target 目标玩家
      */
     public void createDistanceBossBar(Player peeker, Player target) {
-        if (!enabled) return;
-        
+        if (!enabled)
+            return;
+
         removeDistanceBossBar(peeker); // 确保没有残留
-        
+
         String title = formatBossBarTitle(target.getName(), 0.0);
         BossBar bar = Bukkit.createBossBar(
                 title,
                 colorSafe,
-                style
-        );
+                style);
         bar.setProgress(0.0);
         bar.addPlayer(peeker);
         distanceBossBars.put(peeker.getUniqueId(), bar);
@@ -90,26 +92,27 @@ public class BossBarHandler {
 
     /**
      * 为自我观察模式创建距离显示 BossBar
-     * @param peeker 观察者（同时也是目标）
+     * 
+     * @param peeker        观察者（同时也是目标）
      * @param selfPeekLabel 自我观察的标签（如"原点"）
      */
     public void createSelfPeekBossBar(Player peeker, String selfPeekLabel) {
-        if (!enabled) return;
-        
+        if (!enabled)
+            return;
+
         removeDistanceBossBar(peeker); // 确保没有残留
-        
+
         String title = formatBossBarTitle(selfPeekLabel, 0.0);
         BossBar bar = Bukkit.createBossBar(
                 title,
                 colorSafe,
-                style
-        );
+                style);
         bar.setProgress(0.0);
         bar.addPlayer(peeker);
         distanceBossBars.put(peeker.getUniqueId(), bar);
         logDebug("Created self-peek BossBar for player %s", peeker.getName());
     }
-    
+
     private String formatBossBarTitle(String targetName, double distance) {
         return titleFormat
                 .replace("{target}", targetName)
@@ -120,15 +123,20 @@ public class BossBarHandler {
 
     /**
      * 更新观察者的距离 BossBar
-     * @param peeker 观察者
-     * @param distance 当前距离
+     * 
+     * @param peeker     观察者
+     * @param distance   当前距离
      * @param targetName 目标玩家名称
      */
     public void updateDistanceBossBar(Player peeker, double distance, String targetName) {
-        if (!enabled) return;
-        
+        if (!enabled)
+            return;
+        if (!peeker.isOnline())
+            return;
+
         BossBar bar = distanceBossBars.get(peeker.getUniqueId());
-        if (bar == null) return;
+        if (bar == null)
+            return;
 
         double progress = Math.min(distance / maxPeekDistance, 1.0);
         bar.setProgress(progress);
@@ -147,12 +155,14 @@ public class BossBarHandler {
 
     /**
      * 更新观察者的距离 BossBar（从 PeekData 获取目标信息）
-     * @param peeker 观察者
+     * 
+     * @param peeker   观察者
      * @param distance 当前距离
-     * @param data PeekData 数据
+     * @param data     PeekData 数据
      */
     public void updateDistanceBossBar(Player peeker, double distance, PeekData data) {
-        if (!enabled || data == null) return;
+        if (!enabled || data == null)
+            return;
 
         Player target = plugin.getServer().getPlayer(data.getTargetUUID());
         String targetName = target != null ? target.getName() : "未知";
@@ -161,6 +171,7 @@ public class BossBarHandler {
 
     /**
      * 移除观察者的距离 BossBar
+     * 
      * @param peeker 观察者
      */
     public void removeDistanceBossBar(Player peeker) {
@@ -172,6 +183,7 @@ public class BossBarHandler {
 
     /**
      * 安全地移除 BossBar（使用正确的线程调度）
+     * 
      * @param peeker 观察者
      */
     public void safeRemoveDistanceBossBar(Player peeker) {
@@ -180,7 +192,7 @@ public class BossBarHandler {
             removeDistanceBossBar(peeker);
             return;
         }
-        
+
         if (peeker.isOnline()) {
             peeker.getScheduler().run(plugin, scheduledTask -> removeDistanceBossBar(peeker), null);
         } else {
@@ -190,6 +202,7 @@ public class BossBarHandler {
 
     /**
      * 检查是否启用 BossBar
+     * 
      * @return 是否启用
      */
     public boolean isEnabled() {

@@ -33,7 +33,7 @@ public class PlayerStateRestorer {
     public void restorePlayerState(Player peeker, PeekData data) {
         final Runnable onFailed = () -> handleTeleportFailure(peeker, data);
 
-        final boolean scheduled = peeker.getScheduler().execute(plugin, ()-> {
+        final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
 
             // 强制清理任何骑乘/附身状态，防止卡在旁观者模式
             PlayerStateUtil.forceExitRidingState(peeker);
@@ -43,8 +43,11 @@ public class PlayerStateRestorer {
 
             peeker.teleportAsync(data.getOriginalLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                 if (success) {
-                    // 传送成功后再改变游戏模式
-                    applyRestoredState(peeker, data);
+                    // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
+                    peeker.getScheduler().run(plugin,
+                            scheduledTask -> applyRestoredState(peeker, data),
+                            () -> plugin.getLogger().warning(
+                                    String.format("玩家 %s 在传送恢复后离线", peeker.getName())));
                 } else {
                     onFailed.run();
                 }
@@ -80,7 +83,11 @@ public class PlayerStateRestorer {
             final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
                 peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
                     if (spawnSuccess) {
-                        applyRestoredState(peeker, data);
+                        // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
+                        peeker.getScheduler().run(plugin,
+                                scheduledTask -> applyRestoredState(peeker, data),
+                                () -> plugin.getLogger().warning(
+                                        String.format("玩家 %s 在重生点传送恢复后离线", peeker.getName())));
                     } else {
                         onFailed.run();
                     }
@@ -121,7 +128,17 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void forceStateRestoreWithoutTeleport(Player peeker, PeekData data) {
-        applyRestoredState(peeker, data);
+        // 可能从 teleportAsync 回调（线程不确定）调用
+        // 使用实体调度器确保在正确的区域线程上执行
+        if (peeker.isOnline()) {
+            peeker.getScheduler().run(plugin,
+                    scheduledTask -> applyRestoredState(peeker, data),
+                    () -> plugin.getLogger().warning(
+                            String.format("玩家 %s 在强制恢复状态时离线", peeker.getName())));
+        } else {
+            plugin.getLogger().warning(
+                    String.format("玩家 %s 已离线，无法强制恢复状态", peeker.getName()));
+        }
     }
 
     /**

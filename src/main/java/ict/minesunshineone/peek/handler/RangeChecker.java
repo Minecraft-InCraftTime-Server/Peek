@@ -30,18 +30,19 @@ public class RangeChecker {
 
     /**
      * 启动普通 Peek 的距离检查器
-     * @param peeker 观察者
-     * @param target 目标玩家
-     * @param onRangeExceeded 超出距离时的回调
-     * @param onTargetOffline 目标离线时的回调
+     * 
+     * @param peeker           观察者
+     * @param target           目标玩家
+     * @param onRangeExceeded  超出距离时的回调
+     * @param onTargetOffline  目标离线时的回调
      * @param onDistanceUpdate 距离更新时的回调
      * @param onDifferentWorld 不同世界时的回调
      */
     public void startRangeChecker(Player peeker, Player target,
-                                   Runnable onRangeExceeded,
-                                   Runnable onTargetOffline,
-                                   Consumer<Double> onDistanceUpdate,
-                                   Runnable onDifferentWorld) {
+            Runnable onRangeExceeded,
+            Runnable onTargetOffline,
+            Consumer<Double> onDistanceUpdate,
+            Runnable onDifferentWorld) {
         synchronized (this) {
             // 先停止已有的检查器（如果有的话）
             ScheduledTask existingTask = rangeCheckers.remove(peeker.getUniqueId());
@@ -49,10 +50,18 @@ public class RangeChecker {
                 existingTask.cancel();
             }
 
-            ScheduledTask task = target.getScheduler().runAtFixedRate(plugin,
+            // 使用 peeker 的实体调度器，而非 target 的
+            // 这样当 target 换维度时，peeker 的调度器不会退役，不会产生竞态
+            ScheduledTask task = peeker.getScheduler().runAtFixedRate(plugin,
                     scheduledTask -> {
                         // 检查观察者是否死亡
                         if (peeker.isDead()) {
+                            return;
+                        }
+
+                        // 检查目标是否离线
+                        if (!target.isOnline()) {
+                            onTargetOffline.run();
                             return;
                         }
 
@@ -68,8 +77,8 @@ public class RangeChecker {
                         }
                     },
                     () -> {
-                        // 实体调度器退役 -> 目标已经离线或者切换回了配置状态
-                        onTargetOffline.run();
+                        // 实体调度器退役 -> 观察者已经离线
+                        logDebug("Peeker %s's entity scheduler retired, ending peek", peeker.getName());
 
                         // 清理
                         synchronized (RangeChecker.this) {
@@ -84,27 +93,28 @@ public class RangeChecker {
                 return;
             }
 
-            // 实体调度器退役 -> 目标已经离线或者切换回了配置状态
+            // 实体调度器退役 -> 观察者已经离线
             onTargetOffline.run();
         }
     }
 
     /**
      * 启动自我观察模式的距离检查器
-     * @param peeker 观察者
+     * 
+     * @param peeker           观察者
      * @param originalLocation 原始位置
-     * @param getPeekData 获取 PeekData 的函数
-     * @param onRangeExceeded 超出距离时的回调
-     * @param onWorldChanged 世界改变时的回调
+     * @param getPeekData      获取 PeekData 的函数
+     * @param onRangeExceeded  超出距离时的回调
+     * @param onWorldChanged   世界改变时的回调
      * @param onDistanceUpdate 距离更新时的回调
-     * @param onError 发生错误时的回调
+     * @param onError          发生错误时的回调
      */
     public void startSelfRangeChecker(Player peeker, Location originalLocation,
-                                       java.util.function.Supplier<PeekData> getPeekData,
-                                       Runnable onRangeExceeded,
-                                       Runnable onWorldChanged,
-                                       java.util.function.Consumer<Double> onDistanceUpdate,
-                                       Runnable onError) {
+            java.util.function.Supplier<PeekData> getPeekData,
+            Runnable onRangeExceeded,
+            Runnable onWorldChanged,
+            java.util.function.Consumer<Double> onDistanceUpdate,
+            Runnable onError) {
         synchronized (this) {
             // 先停止已有的检查器（如果有的话）
             stopRangeChecker(peeker);
@@ -113,7 +123,8 @@ public class RangeChecker {
                     scheduledTask -> {
                         // 检查观察者是否死亡（与普通peek逻辑一致）
                         if (peeker.isDead()) {
-                            logDebug("Player %s died during self peek, but continuing to monitor for respawn", peeker.getName());
+                            logDebug("Player %s died during self peek, but continuing to monitor for respawn",
+                                    peeker.getName());
                             return; // 不立即结束，等待重生处理
                         }
 
@@ -160,6 +171,7 @@ public class RangeChecker {
 
     /**
      * 停止指定玩家的距离检查器
+     * 
      * @param peeker 观察者
      */
     public void stopRangeChecker(Player peeker) {
@@ -174,6 +186,7 @@ public class RangeChecker {
 
     /**
      * 获取最大 Peek 距离
+     * 
      * @return 最大距离
      */
     public double getMaxPeekDistance() {

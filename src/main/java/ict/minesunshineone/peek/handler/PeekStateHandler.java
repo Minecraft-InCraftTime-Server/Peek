@@ -267,9 +267,12 @@ public class PeekStateHandler {
                     if (!success) {
                         onFailed.run();
                     } else {
-                        // 传送成功后，使用玩家的实体调度器确保在正确线程执行
-                        bossBarHandler.createDistanceBossBar(peeker, target);
-                        startNormalRangeChecker(peeker, target);
+                        // teleportAsync 的回调线程不确定
+                        // 使用 peeker 的实体调度器确保在正确的区域线程执行
+                        peeker.getScheduler().run(plugin, scheduledTask -> {
+                            bossBarHandler.createDistanceBossBar(peeker, target);
+                            startNormalRangeChecker(peeker, target);
+                        }, () -> logDebug("Peeker %s went offline after teleport", peeker.getName()));
                     }
                 });
             }, onFailed, 2L); // 2 tick 延迟
@@ -287,11 +290,14 @@ public class PeekStateHandler {
     private void setSelfPeekGameMode(Player peeker) {
         peeker.getScheduler().execute(plugin, () -> {
             // 这里如果玩家离线了调度器会自动退役
-            /*if (!peeker.isOnline()) {
-                plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线", peeker.getName()));
-                endPeek(peeker, false);
-                return;
-            }*/
+            /*
+             * if (!peeker.isOnline()) {
+             * plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线",
+             * peeker.getName()));
+             * endPeek(peeker, false);
+             * return;
+             * }
+             */
 
             if (peeker.isDead()) {
                 plugin.getSLF4JLogger().warn("玩家 {} 在设置自我观察模式时已死亡", peeker.getName());
@@ -326,8 +332,9 @@ public class PeekStateHandler {
                     PeekData data = activePeeks.get(peeker.getUniqueId());
                     bossBarHandler.updateDistanceBossBar(peeker, distance, data);
                 },
-                // 不同世界时
+                // 不同世界时 - 先停止旧的距离检查器，防止竞态重复触发
                 () -> {
+                    rangeChecker.stopRangeChecker(peeker);
                     plugin.getMessages().send(peeker, "target-in-different-world");
                     teleportAndSetGameMode(peeker, target);
                 });
@@ -360,14 +367,9 @@ public class PeekStateHandler {
     }
 
     private void startRespawnWatcher(Player peeker, PeekData data) {
-        plugin.getServer().getRegionScheduler().runAtFixedRate(plugin,
-                peeker.getLocation(),
+        // 使用 peeker 的实体调度器，避免 RegionScheduler 坐标过时问题
+        peeker.getScheduler().runAtFixedRate(plugin,
                 task -> {
-                    if (!peeker.isOnline()) {
-                        task.cancel();
-                        return;
-                    }
-
                     if (!peeker.isDead()) {
                         task.cancel();
                         stateRestorer.restorePlayerState(peeker, data);
@@ -375,6 +377,7 @@ public class PeekStateHandler {
                         plugin.getMessages().send(peeker, "peek-end-respawn");
                     }
                 },
+                () -> logDebug("Peeker %s went offline during respawn watch", peeker.getName()),
                 1L, 20L);
     }
 
