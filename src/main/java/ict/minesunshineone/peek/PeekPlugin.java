@@ -9,12 +9,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import ict.minesunshineone.peek.command.PeekCommand;
+import ict.minesunshineone.peek.data.PeekData;
 import ict.minesunshineone.peek.handler.PeekStateHandler;
 import ict.minesunshineone.peek.handler.PeekTargetHandler;
 import ict.minesunshineone.peek.listener.PeekInteractionListener;
 import ict.minesunshineone.peek.listener.PeekListener;
 import ict.minesunshineone.peek.listener.PeekPacketListener;
 import ict.minesunshineone.peek.manager.CooldownManager;
+import java.util.UUID;
 import ict.minesunshineone.peek.manager.PrivacyManager;
 import ict.minesunshineone.peek.manager.StateManager;
 import ict.minesunshineone.peek.manager.StatisticsManager;
@@ -81,14 +83,35 @@ public class PeekPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (stateHandler != null) {
-            new HashMap<>(stateHandler.getActivePeeks()).forEach((uuid, data) -> {
-                Player player = getServer().getPlayer(uuid);
-                if (player != null && player.isOnline()) {
-                    stateHandler.endPeek(player, true);
-                }
-            });
-            // 清理所有剩余资源（BossBar、距离检查器等）
+            // 先取消所有定时任务（RangeChecker、BossBar等）
             stateHandler.cleanup();
+
+            // 同步恢复所有观察中的玩家状态
+            // 服务器关闭时不能依赖异步任务完成
+            for (Map.Entry<UUID, PeekData> entry : new HashMap<>(stateHandler.getActivePeeks()).entrySet()) {
+                Player player = getServer().getPlayer(entry.getKey());
+                PeekData data = entry.getValue();
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+
+                // 记录统计
+                long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
+                statisticsManager.recordPeekEnd(player, duration);
+
+                if (!player.isDead()) {
+                    try {
+                        ict.minesunshineone.peek.util.PlayerStateUtil.forceExitRidingState(player);
+                        player.teleport(data.getOriginalLocation());
+                        stateHandler.getStateRestorer().applyRestoredState(player, data);
+                    } catch (Exception e) {
+                        getLogger().warning(String.format("关服时无法恢复玩家 %s 的状态，将在重连时恢复: %s",
+                                player.getName(), e.getMessage()));
+                        // 状态文件保留在磁盘上，下次登录时 onPlayerJoin 自动恢复
+                    }
+                }
+                // 死亡玩家的状态文件保留，下次登录时自动恢复
+            }
         }
 
         if (statisticsManager != null) {

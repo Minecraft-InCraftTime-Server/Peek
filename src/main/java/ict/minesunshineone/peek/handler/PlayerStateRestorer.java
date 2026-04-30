@@ -51,6 +51,10 @@ public class PlayerStateRestorer {
                 } else {
                     onFailed.run();
                 }
+            }).exceptionally(ex -> {
+                plugin.getLogger().warning(String.format("恢复玩家 %s 传送时发生异常: %s", peeker.getName(), ex.getMessage()));
+                onFailed.run();
+                return null;
             });
         }, onFailed, 1L);
 
@@ -91,6 +95,10 @@ public class PlayerStateRestorer {
                     } else {
                         onFailed.run();
                     }
+                }).exceptionally(ex -> {
+                    plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时发生异常: %s", peeker.getName(), ex.getMessage()));
+                    onFailed.run();
+                    return null;
                 });
             }, onFailed, 1L);
 
@@ -163,6 +171,9 @@ public class PlayerStateRestorer {
         // 清除现有效果并应用保存的效果
         peeker.getActivePotionEffects().forEach(effect -> peeker.removePotionEffect(effect.getType()));
         data.getPotionEffects().forEach(effect -> peeker.addPotionEffect(effect));
+
+        // 游戏模式已恢复，现在安全地清除状态文件
+        plugin.getStateManager().clearPlayerState(peeker);
     }
 
     /**

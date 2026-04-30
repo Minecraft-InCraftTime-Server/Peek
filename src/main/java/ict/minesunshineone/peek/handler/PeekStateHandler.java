@@ -214,10 +214,6 @@ public class PeekStateHandler {
                 }
             }
 
-            if (shouldRestore && !peeker.isDead()) {
-                plugin.getStateManager().clearPlayerState(peeker);
-            }
-
             // 发送消息
             if (peeker.isOnline()) {
                 plugin.getMessages().send(peeker, "peek-end");
@@ -274,6 +270,10 @@ public class PeekStateHandler {
                             startNormalRangeChecker(peeker, target);
                         }, () -> logDebug("Peeker %s went offline after teleport", peeker.getName()));
                     }
+                }).exceptionally(ex -> {
+                    plugin.getLogger().warning(String.format("传送玩家 %s 时发生异常: %s", peeker.getName(), ex.getMessage()));
+                    onFailed.run();
+                    return null;
                 });
             }, onFailed, 2L); // 2 tick 延迟
 
@@ -373,7 +373,6 @@ public class PeekStateHandler {
                     if (!peeker.isDead()) {
                         task.cancel();
                         stateRestorer.restorePlayerState(peeker, data);
-                        plugin.getStateManager().clearPlayerState(peeker);
                         plugin.getMessages().send(peeker, "peek-end-respawn");
                     }
                 },

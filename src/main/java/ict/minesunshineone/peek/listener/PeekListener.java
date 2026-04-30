@@ -70,9 +70,8 @@ public class PeekListener implements Listener {
                     task -> {
                         if (!player.isDead()) {
                             task.cancel();
-                            // 直接恢复状态
+                            // 直接恢复状态（clearPlayerState 在 applyRestoredState 中执行）
                             plugin.getStateHandler().getStateRestorer().restorePlayerState(player, savedState);
-                            plugin.getStateManager().clearPlayerState(player);
                             // 发送断线重连提示
                             plugin.getMessages().send(player, "peek-end-offline");
                         }
