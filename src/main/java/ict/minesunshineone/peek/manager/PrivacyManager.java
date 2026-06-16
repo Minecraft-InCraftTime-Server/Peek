@@ -1,6 +1,7 @@
 package ict.minesunshineone.peek.manager;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -74,63 +75,6 @@ public class PrivacyManager {
         
         plugin.getLogger().info(String.format("玩家 %s %s了私人模式", 
                 player.getName(), currentMode ? "禁用" : "启用"));
-    }
-
-    /**
-     * 清除玩家的私人模式状态（用于调试或管理员操作）
-     */
-    public void clearPrivateMode(Player player) {
-        if (player == null || !player.isOnline()) {
-            return;
-        }
-        
-        player.getPersistentDataContainer().remove(PRIVACY_MODE_KEY);
-        plugin.getLogger().info(String.format("已清除玩家 %s 的私人模式设置", player.getName()));
-    }
-
-    /**
-     * 管理员方法：设置玩家的隐私模式状态
-     * @param player 目标玩家
-     * @param enabled 是否启用隐私模式
-     */
-    public void setPrivateMode(Player player, boolean enabled) {
-        if (player == null || !player.isOnline()) {
-            return;
-        }
-        
-        if (enabled) {
-            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 1);
-        } else {
-            player.getPersistentDataContainer().set(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) 0);
-        }
-        
-        plugin.getLogger().info(String.format("管理员设置玩家 %s 的隐私模式为: %s", 
-                player.getName(), enabled ? "启用" : "禁用"));
-    }
-
-    /**
-     * 获取所有在线玩家中启用了隐私模式的玩家数量
-     */
-    public int getPrivateModePlayerCount() {
-        return (int) plugin.getServer().getOnlinePlayers().stream()
-                .filter(this::isPrivateMode)
-                .count();
-    }
-
-    /**
-     * 调试方法：验证 PersistentData 实施
-     */
-    public String debugPrivacyStatus(Player player) {
-        if (player == null) {
-            return "玩家为空";
-        }
-        
-        boolean hasKey = player.getPersistentDataContainer().has(PRIVACY_MODE_KEY, PersistentDataType.BYTE);
-        byte value = player.getPersistentDataContainer().getOrDefault(PRIVACY_MODE_KEY, PersistentDataType.BYTE, (byte) -1);
-        boolean isPrivate = isPrivateMode(player);
-        
-        return String.format("玩家: %s | 有PersistentData键: %s | 值: %d | 隐私模式: %s", 
-                player.getName(), hasKey, value, isPrivate);
     }
 
     /**
@@ -274,7 +218,12 @@ public class PrivacyManager {
             return false;
         }
 
-        return System.currentTimeMillis() - lastRequest < cooldownDuration * 1000L;
+        if (System.currentTimeMillis() - lastRequest >= cooldownDuration * 1000L) {
+            // 冷却已过期，顺手清理该键，避免 requestCooldowns 无限增长
+            requestCooldowns.remove(key);
+            return false;
+        }
+        return true;
     }
 
     private synchronized int getRemainingRequestCooldown(Player peeker, Player target) {
@@ -327,6 +276,10 @@ public class PrivacyManager {
 
         // 清理空的映射
         pendingRequests.values().removeIf(Map::isEmpty);
+
+        // 清理该玩家相关的请求冷却记录，避免离线玩家的键长期堆积
+        String uuidStr = playerUuid.toString();
+        requestCooldowns.keySet().removeIf(key -> key.contains(uuidStr));
     }
 
     public synchronized void handleAccept(Player player) {
@@ -370,7 +323,29 @@ public class PrivacyManager {
         }
     }
 
-    public synchronized Map<UUID, Map<UUID, ScheduledTask>> getPendingRequests() {
-        return new HashMap<>(pendingRequests); // TODO 好罢这玩意我也不想重构，先用COW顶着罢()
+    /**
+     * 玩家死亡时，线程安全地取消其作为请求者发出的所有观察请求，并通知双方。
+     * 直接在锁内操作，避免对外暴露内部可变映射导致的并发问题。
+     */
+    public synchronized void cancelRequestsByPeekerOnDeath(Player peeker) {
+        UUID peekerUuid = peeker.getUniqueId();
+        Iterator<Map.Entry<UUID, Map<UUID, ScheduledTask>>> it = pendingRequests.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Map<UUID, ScheduledTask>> entry = it.next();
+            Map<UUID, ScheduledTask> requests = entry.getValue();
+            ScheduledTask task = requests.remove(peekerUuid);
+            if (task == null) {
+                continue;
+            }
+            task.cancel();
+            plugin.getMessages().send(peeker, "request-cancelled-death");
+            Player target = plugin.getServer().getPlayer(entry.getKey());
+            if (target != null && target.isOnline()) {
+                plugin.getMessages().send(target, "request-cancelled-death-target");
+            }
+            if (requests.isEmpty()) {
+                it.remove();
+            }
+        }
     }
 }

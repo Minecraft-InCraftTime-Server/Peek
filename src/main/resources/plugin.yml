@@ -1,7 +1,7 @@
 name: Peek
 version: '${project.version}'
 main: ict.minesunshineone.peek.PeekPlugin
-api-version: '1.20'
+api-version: '1.21'
 authors: [MineSunshineOne]
 description: 一个允许玩家观察其他玩家的插件
 website: https://github.com/MineSunshineOne/Peek

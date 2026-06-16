@@ -3,7 +3,7 @@ package ict.minesunshineone.peek.command;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import org.bukkit.command.Command;
@@ -13,6 +13,11 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 public class PeekCommand implements CommandExecutor, TabCompleter {
 
@@ -169,8 +174,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
         }
 
         // 随机选择一个目标
-        Random random = new Random();
-        Player target = availableTargets.get(random.nextInt(availableTargets.size()));
+        Player target = availableTargets.get(ThreadLocalRandom.current().nextInt(availableTargets.size()));
 
         // 发送随机选择提示
         plugin.getMessages().send(player, "random-peek-selected", "player", target.getName());
@@ -181,28 +185,21 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(Player player) {
-        player.sendMessage(net.kyori.adventure.text.Component.empty());
-        player.sendMessage(net.kyori.adventure.text.Component
-                .text("═══════ ", net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
-                .append(net.kyori.adventure.text.Component.text("观察指令帮助",
-                        net.kyori.adventure.text.format.NamedTextColor.GREEN,
-                        net.kyori.adventure.text.format.TextDecoration.BOLD))
-                .append(net.kyori.adventure.text.Component.text(" ═══════",
-                        net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)));
-        player.sendMessage(net.kyori.adventure.text.Component.empty());
+        player.sendMessage(Component.empty());
+        player.sendMessage(Component
+                .text("═══════ ", NamedTextColor.DARK_GRAY)
+                .append(Component.text("观察指令帮助", NamedTextColor.GREEN, TextDecoration.BOLD))
+                .append(Component.text(" ═══════", NamedTextColor.DARK_GRAY)));
+        player.sendMessage(Component.empty());
 
-        player.sendMessage(
-                net.kyori.adventure.text.Component.text("▸ 观察功能", net.kyori.adventure.text.format.NamedTextColor.AQUA,
-                        net.kyori.adventure.text.format.TextDecoration.BOLD));
+        player.sendMessage(Component.text("▸ 观察功能", NamedTextColor.AQUA, TextDecoration.BOLD));
         sendCmd(player, "/peek <玩家名>", "观察指定玩家的视角");
         sendCmd(player, "/peek random", "随机观察一位在线玩家");
         sendCmd(player, "/peek self", "原地peek自己");
         sendCmd(player, "/peek exit", "退出观察模式");
 
-        player.sendMessage(net.kyori.adventure.text.Component.empty());
-        player.sendMessage(net.kyori.adventure.text.Component.text("▸ 隐私与统计",
-                net.kyori.adventure.text.format.NamedTextColor.YELLOW,
-                net.kyori.adventure.text.format.TextDecoration.BOLD));
+        player.sendMessage(Component.empty());
+        player.sendMessage(Component.text("▸ 隐私与统计", NamedTextColor.YELLOW, TextDecoration.BOLD));
         sendCmd(player, "/peek privacy", "切换隐私模式");
         sendCmd(player, "/peek accept", "接受观察请求");
         sendCmd(player, "/peek deny", "拒绝观察请求");
@@ -210,29 +207,23 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
             sendCmd(player, "/peek stats", "查看观察统计数据");
         }
 
-        player.sendMessage(net.kyori.adventure.text.Component.empty());
-        player.sendMessage(
-                net.kyori.adventure.text.Component.text("提示: ", net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                        .append(net.kyori.adventure.text.Component.text("点击命令可快速填入聊天框",
-                                net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY,
-                                net.kyori.adventure.text.format.TextDecoration.ITALIC)));
-        player.sendMessage(net.kyori.adventure.text.Component.empty());
+        player.sendMessage(Component.empty());
+        player.sendMessage(Component.text("提示: ", NamedTextColor.GRAY)
+                .append(Component.text("点击命令可快速填入聊天框",
+                        NamedTextColor.DARK_GRAY, TextDecoration.ITALIC)));
+        player.sendMessage(Component.empty());
     }
 
     private void sendCmd(Player player, String cmd, String desc) {
-        net.kyori.adventure.text.Component cmdComponent = net.kyori.adventure.text.Component
-                .text("  " + cmd, net.kyori.adventure.text.format.NamedTextColor.GREEN)
-                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
-                        net.kyori.adventure.text.Component
-                                .text(desc, net.kyori.adventure.text.format.NamedTextColor.WHITE)
-                                .append(net.kyori.adventure.text.Component.newline())
-                                .append(net.kyori.adventure.text.Component.text("点击填入命令",
-                                        net.kyori.adventure.text.format.NamedTextColor.GRAY,
-                                        net.kyori.adventure.text.format.TextDecoration.ITALIC))))
-                .clickEvent(net.kyori.adventure.text.event.ClickEvent.suggestCommand(cmd.split("<")[0].trim() + " "));
+        Component cmdComponent = Component
+                .text("  " + cmd, NamedTextColor.GREEN)
+                .hoverEvent(HoverEvent.showText(Component
+                        .text(desc, NamedTextColor.WHITE)
+                        .append(Component.newline())
+                        .append(Component.text("点击填入命令", NamedTextColor.GRAY, TextDecoration.ITALIC))))
+                .clickEvent(ClickEvent.suggestCommand(cmd.split("<")[0].trim() + " "));
 
-        net.kyori.adventure.text.Component descComponent = net.kyori.adventure.text.Component.text(" - " + desc,
-                net.kyori.adventure.text.format.NamedTextColor.GRAY);
+        Component descComponent = Component.text(" - " + desc, NamedTextColor.GRAY);
 
         player.sendMessage(cmdComponent.append(descComponent));
     }

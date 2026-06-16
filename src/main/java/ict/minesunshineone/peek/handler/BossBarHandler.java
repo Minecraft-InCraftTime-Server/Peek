@@ -201,15 +201,6 @@ public class BossBarHandler {
     }
 
     /**
-     * 检查是否启用 BossBar
-     * 
-     * @return 是否启用
-     */
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
      * 清理所有 BossBar
      */
     public void cleanup() {

@@ -19,7 +19,8 @@ public class PeekData {
     private final int foodLevel;
     private final float saturation;
     private final Collection<PotionEffect> potionEffects;
-    private boolean exiting;
+    // volatile：exiting 会被区域线程的延迟任务读取（sessionEnded），而由 endPeek 写入
+    private volatile boolean exiting;
 
     public PeekData(Location originalLocation, GameMode originalGameMode, UUID targetUUID,
             long startTime, double health, int foodLevel, float saturation, Collection<PotionEffect> potionEffects) {

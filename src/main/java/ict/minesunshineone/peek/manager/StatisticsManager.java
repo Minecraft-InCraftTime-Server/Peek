@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -144,45 +146,47 @@ public class StatisticsManager {
 
     public static class PlayerStats {
 
-        private int peekCount;
-        private int peekedCount;
-        private long totalDuration;
+        // 使用原子类型：观察者与被观察者的统计可能在不同区域线程并发更新，
+        // 同时异步保存线程会读取，普通 int/long 的 ++/+= 会丢失更新或读到撕裂值
+        private final AtomicInteger peekCount = new AtomicInteger();
+        private final AtomicInteger peekedCount = new AtomicInteger();
+        private final AtomicLong totalDuration = new AtomicLong();
 
         public void incrementPeekCount() {
-            peekCount++;
+            peekCount.incrementAndGet();
         }
 
         public void incrementPeekedCount() {
-            peekedCount++;
+            peekedCount.incrementAndGet();
         }
 
         public void addPeekDuration(long seconds) {
-            totalDuration += seconds;
+            totalDuration.addAndGet(seconds);
         }
 
         // Getters and setters
         public int getPeekCount() {
-            return peekCount;
+            return peekCount.get();
         }
 
         public void setPeekCount(int count) {
-            this.peekCount = count;
+            this.peekCount.set(count);
         }
 
         public int getPeekedCount() {
-            return peekedCount;
+            return peekedCount.get();
         }
 
         public void setPeekedCount(int count) {
-            this.peekedCount = count;
+            this.peekedCount.set(count);
         }
 
         public long getTotalDuration() {
-            return totalDuration;
+            return totalDuration.get();
         }
 
         public void setTotalDuration(long duration) {
-            this.totalDuration = duration;
+            this.totalDuration.set(duration);
         }
     }
 }

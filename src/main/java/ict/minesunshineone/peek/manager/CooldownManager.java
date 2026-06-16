@@ -50,8 +50,4 @@ public class CooldownManager {
         long remaining = (lastUsage + cooldownDuration * 1000L - System.currentTimeMillis()) / 1000L;
         return Math.max(0, (int) remaining);
     }
-
-    public void clearCooldown(Player player) {
-        cooldowns.remove(player.getUniqueId());
-    }
 }

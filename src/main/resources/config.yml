@@ -45,10 +45,5 @@ statistics:
   enabled: true           # 是否启用统计
   save-interval: 600      # 自动保存间隔(秒)
 
-# 文件设置
-files:
-  stats: "stats.yml"      # 统计文件名
-  states: "states.yml"    # 状态文件名
-
 # 语言设置
 language: "zh_CN"  # 默认语言

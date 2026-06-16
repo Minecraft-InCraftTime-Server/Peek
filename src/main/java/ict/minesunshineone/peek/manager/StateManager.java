@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -50,7 +52,8 @@ public class StateManager {
         List<Map<String, Object>> effects = new ArrayList<>();
         for (PotionEffect effect : data.getPotionEffects()) {
             Map<String, Object> effectMap = new HashMap<>();
-            effectMap.put("type", effect.getType().getName());
+            // 使用命名空间键（如 minecraft:speed）替代已弃用的 getName()
+            effectMap.put("type", effect.getType().getKey().asString());
             effectMap.put("duration", effect.getDuration());
             effectMap.put("amplifier", effect.getAmplifier());
             effectMap.put("ambient", effect.isAmbient());
@@ -89,7 +92,8 @@ public class StateManager {
             List<PotionEffect> effects = new ArrayList<>();
             List<Map<?, ?>> effectsList = config.getMapList("potion_effects");
             for (Map<?, ?> effectMap : effectsList) {
-                PotionEffectType type = PotionEffectType.getByName((String) effectMap.get("type"));
+                String typeName = (String) effectMap.get("type");
+                PotionEffectType type = resolvePotionEffectType(typeName);
                 if (type != null) {
                     effects.add(new PotionEffect(
                             type,
@@ -99,6 +103,9 @@ public class StateManager {
                             (Boolean) effectMap.get("particles"),
                             (Boolean) effectMap.get("icon")
                     ));
+                } else {
+                    plugin.getLogger().warning(String.format(
+                            "无法解析玩家 %s 的药水效果类型 \"%s\"，已跳过", player.getName(), typeName));
                 }
             }
 
@@ -114,5 +121,25 @@ public class StateManager {
         if (stateFile.exists()) {
             stateFile.delete();
         }
+    }
+
+    /**
+     * 解析药水效果类型，优先使用命名空间键（minecraft:speed），
+     * 兼容旧状态文件中的大写枚举名（如 "SPEED"）。
+     */
+    @SuppressWarnings("deprecation")
+    private PotionEffectType resolvePotionEffectType(String name) {
+        if (name == null) {
+            return null;
+        }
+        NamespacedKey key = NamespacedKey.fromString(name);
+        if (key != null) {
+            PotionEffectType type = Registry.EFFECT.get(key);
+            if (type != null) {
+                return type;
+            }
+        }
+        // 回退到旧的按名称查找，保证老状态文件可正常读取
+        return PotionEffectType.getByName(name);
     }
 }

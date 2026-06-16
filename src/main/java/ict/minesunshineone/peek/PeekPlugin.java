@@ -102,12 +102,37 @@ public class PeekPlugin extends JavaPlugin {
                 if (!player.isDead()) {
                     try {
                         ict.minesunshineone.peek.util.PlayerStateUtil.forceExitRidingState(player);
-                        player.teleport(data.getOriginalLocation());
-                        stateHandler.getStateRestorer().applyRestoredState(player, data);
-                    } catch (Exception e) {
-                        getLogger().warning(String.format("关服时无法恢复玩家 %s 的状态，将在重连时恢复: %s",
-                                player.getName(), e.getMessage()));
-                        // 状态文件保留在磁盘上，下次登录时 onPlayerJoin 自动恢复
+                    } catch (Throwable ignored) {
+                        // 忽略骑乘清理异常
+                    }
+                    // 尝试把玩家同步传送回原位置；Folia 上跨区域同步传送会抛异常
+                    boolean teleported;
+                    try {
+                        teleported = player.teleport(data.getOriginalLocation());
+                    } catch (Throwable t) {
+                        teleported = false;
+                        getLogger().warning(String.format("关服时无法将玩家 %s 同步传送回原位置: %s",
+                                player.getName(), t.getMessage()));
+                    }
+
+                    if (teleported) {
+                        // 传送成功：完整恢复状态并清理状态文件
+                        try {
+                            stateHandler.getStateRestorer().applyRestoredState(player, data);
+                        } catch (Exception e) {
+                            getLogger().warning(String.format("关服时无法恢复玩家 %s 的状态，将在重连时恢复: %s",
+                                    player.getName(), e.getMessage()));
+                            // applyRestoredState 失败时状态文件保留，下次登录时 onPlayerJoin 自动恢复
+                        }
+                    } else {
+                        // 传送失败：至少恢复游戏模式，确保玩家绝不会卡在旁观模式；
+                        // 同时保留状态文件，下次登录时由 onPlayerJoin 传送回原位置完成完整恢复
+                        try {
+                            player.setGameMode(data.getOriginalGameMode());
+                        } catch (Throwable t) {
+                            getLogger().warning(String.format("关服时无法恢复玩家 %s 的游戏模式，将在重连时恢复: %s",
+                                    player.getName(), t.getMessage()));
+                        }
                     }
                 }
                 // 死亡玩家的状态文件保留，下次登录时自动恢复
@@ -115,7 +140,8 @@ public class PeekPlugin extends JavaPlugin {
         }
 
         if (statisticsManager != null) {
-            statisticsManager.saveStats();
+            // shutdown() 会取消自动保存任务并保存统计数据
+            statisticsManager.shutdown();
         }
 
         // 注意：隐私管理器现在使用 PersistentData，无需手动保存

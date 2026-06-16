@@ -33,29 +33,45 @@ public class PlayerStateRestorer {
     public void restorePlayerState(Player peeker, PeekData data) {
         final Runnable onFailed = () -> handleTeleportFailure(peeker, data);
 
+        // 原始位置所在世界可能已被卸载/删除，导致 teleportAsync 同步抛出 IllegalArgumentException。
+        // 这种异常既不会进入 thenAccept/exceptionally，也不会触发离线回调，
+        // 会让玩家永久卡在旁观模式。因此提前校验，必要时回退到重生点恢复。
+        final Location originalLocation = data.getOriginalLocation();
+        if (originalLocation == null || originalLocation.getWorld() == null) {
+            plugin.getLogger().warning(String.format(
+                    "玩家 %s 的原始位置世界不可用，回退到重生点恢复", peeker.getName()));
+            handleTeleportFailure(peeker, data);
+            return;
+        }
+
         final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
+            try {
+                // 强制清理任何骑乘/附身状态，防止卡在旁观者模式
+                PlayerStateUtil.forceExitRidingState(peeker);
 
-            // 强制清理任何骑乘/附身状态，防止卡在旁观者模式
-            PlayerStateUtil.forceExitRidingState(peeker);
+                // 在传送前先清除动量
+                peeker.setVelocity(ZERO_VECTOR);
 
-            // 在传送前先清除动量
-            peeker.setVelocity(ZERO_VECTOR);
-
-            peeker.teleportAsync(data.getOriginalLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
-                if (success) {
-                    // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
-                    peeker.getScheduler().run(plugin,
-                            scheduledTask -> applyRestoredState(peeker, data),
-                            () -> plugin.getLogger().warning(
-                                    String.format("玩家 %s 在传送恢复后离线", peeker.getName())));
-                } else {
+                peeker.teleportAsync(originalLocation, TeleportCause.PLUGIN).thenAccept(success -> {
+                    if (success) {
+                        // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
+                        peeker.getScheduler().run(plugin,
+                                scheduledTask -> applyRestoredState(peeker, data),
+                                () -> plugin.getLogger().warning(
+                                        String.format("玩家 %s 在传送恢复后离线", peeker.getName())));
+                    } else {
+                        onFailed.run();
+                    }
+                }).exceptionally(ex -> {
+                    plugin.getLogger().warning(String.format("恢复玩家 %s 传送时发生异常: %s", peeker.getName(), ex.getMessage()));
                     onFailed.run();
-                }
-            }).exceptionally(ex -> {
-                plugin.getLogger().warning(String.format("恢复玩家 %s 传送时发生异常: %s", peeker.getName(), ex.getMessage()));
+                    return null;
+                });
+            } catch (Throwable t) {
+                // teleportAsync 可能同步抛出（如世界为 null），兜底回退避免卡旁观者
+                plugin.getLogger().warning(String.format("恢复玩家 %s 传送时同步异常: %s", peeker.getName(), t.getMessage()));
                 onFailed.run();
-                return null;
-            });
+            }
         }, onFailed, 1L);
 
         if (!scheduled) {
@@ -83,23 +99,29 @@ public class PlayerStateRestorer {
             forceStateRestoreWithoutTeleport(peeker, data);
         };
 
-        if (spawnLoc != null) {
+        if (spawnLoc != null && spawnLoc.getWorld() != null) {
             final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
-                peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
-                    if (spawnSuccess) {
-                        // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
-                        peeker.getScheduler().run(plugin,
-                                scheduledTask -> applyRestoredState(peeker, data),
-                                () -> plugin.getLogger().warning(
-                                        String.format("玩家 %s 在重生点传送恢复后离线", peeker.getName())));
-                    } else {
+                try {
+                    peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
+                        if (spawnSuccess) {
+                            // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
+                            peeker.getScheduler().run(plugin,
+                                    scheduledTask -> applyRestoredState(peeker, data),
+                                    () -> plugin.getLogger().warning(
+                                            String.format("玩家 %s 在重生点传送恢复后离线", peeker.getName())));
+                        } else {
+                            onFailed.run();
+                        }
+                    }).exceptionally(ex -> {
+                        plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时发生异常: %s", peeker.getName(), ex.getMessage()));
                         onFailed.run();
-                    }
-                }).exceptionally(ex -> {
-                    plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时发生异常: %s", peeker.getName(), ex.getMessage()));
+                        return null;
+                    });
+                } catch (Throwable t) {
+                    // 即使重生点传送同步抛出，也要强制恢复游戏模式，绝不卡旁观者
+                    plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时同步异常: %s", peeker.getName(), t.getMessage()));
                     onFailed.run();
-                    return null;
-                });
+                }
             }, onFailed, 1L);
 
             if (!scheduled) {

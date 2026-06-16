@@ -185,15 +185,6 @@ public class RangeChecker {
     }
 
     /**
-     * 获取最大 Peek 距离
-     * 
-     * @return 最大距离
-     */
-    public double getMaxPeekDistance() {
-        return maxPeekDistance;
-    }
-
-    /**
      * 清理所有检查器
      */
     public void cleanup() {

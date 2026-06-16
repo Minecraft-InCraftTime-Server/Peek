@@ -14,7 +14,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PeekListener implements Listener {
 
@@ -86,21 +85,14 @@ public class PeekListener implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
 
-        // 如果玩家死亡时有发出的请求，取消所有请求
-        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry : plugin.getPrivacyManager().getPendingRequests()
-                .entrySet()) {
-            Map<UUID, ScheduledTask> requests = entry.getValue();
-            if (requests.containsKey(player.getUniqueId())) {
-                // 取消该玩家发出的请求
-                Player target = plugin.getServer().getPlayer(entry.getKey());
-                plugin.getPrivacyManager().removePendingRequest(player, target);
-
-                // 发送消息给双方
-                plugin.getMessages().send(player, "request-cancelled-death");
-                if (target != null && target.isOnline()) {
-                    plugin.getMessages().send(target, "request-cancelled-death-target");
-                }
-            }
+        // 如果死亡的玩家正在观察别人，结束其观察会话。
+        // endPeek 检测到玩家已死亡会启动重生监视器，待重生后恢复状态，
+        // 避免玩家重生后卡在旁观模式。
+        if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
+            plugin.getStateHandler().endPeek(player);
         }
+
+        // 如果玩家死亡时有发出的请求，线程安全地取消这些请求并通知双方
+        plugin.getPrivacyManager().cancelRequestsByPeekerOnDeath(player);
     }
 }

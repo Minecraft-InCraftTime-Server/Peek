@@ -1,9 +1,9 @@
 package ict.minesunshineone.peek.handler;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -22,7 +22,9 @@ import ict.minesunshineone.peek.util.PlayerStateUtil;
 public class PeekStateHandler {
 
     private final PeekPlugin plugin;
-    private final Map<UUID, PeekData> activePeeks = new HashMap<>();
+    // 使用 ConcurrentHashMap：activePeeks 会被 Netty(数据包)、区域线程、异步线程读取
+    // synchronized(activePeeks) 仅用于"检查-修改"复合操作的原子性
+    private final Map<UUID, PeekData> activePeeks = new ConcurrentHashMap<>();
 
     // 委托的处理器
     private final BossBarHandler bossBarHandler;
@@ -182,58 +184,54 @@ public class PeekStateHandler {
             return;
         }
 
+        // 仅在锁内完成"领取退出权"：判定 + 标记 + 移除。
+        // 随后的恢复、传送、消息都在锁外执行，避免长时间持有 activePeeks 锁，
+        // 从而消除与 RangeChecker 锁之间的顺序反转死锁风险。
+        final PeekData data;
         synchronized (activePeeks) {
-            PeekData data = activePeeks.get(peeker.getUniqueId());
-            if (data == null) {
+            data = activePeeks.get(peeker.getUniqueId());
+            if (data == null || data.isExiting()) {
                 return;
             }
-
-            if (data.isExiting()) {
-                return;
-            }
-
             data.setExiting(true);
-            Player target = plugin.getServer().getPlayer(data.getTargetUUID());
-
-            // 记录统计
-            long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
-            plugin.getStatisticsManager().recordPeekEnd(peeker, duration);
-
-            // 设置冷却
-            plugin.getCooldownManager().setCooldown(peeker);
-
-            // 停止距离检查器并移除 BossBar
-            stopRangeCheckerAndBossBar(peeker);
-
-            if (shouldRestore && peeker.isOnline()) {
-                if (peeker.isDead()) {
-                    startRespawnWatcher(peeker, data);
-                } else {
-                    // 玩家未死亡，直接恢复状态
-                    stateRestorer.restorePlayerState(peeker, data);
-                }
-            }
-
-            // 发送消息
-            if (peeker.isOnline()) {
-                plugin.getMessages().send(peeker, "peek-end");
-            }
-
-            // 检查是否是自我观察模式
-            boolean isSelfPeek = target != null && target.getUniqueId().equals(peeker.getUniqueId());
-            boolean silentPeek = peeker.isOnline() && plugin.getTargetHandler().shouldSilentPeek(peeker);
-
-            // 非自我观察且非静默模式才通知目标
-            if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
-                plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
-                playSound(target, "end-peek");
-            }
-
             activePeeks.remove(peeker.getUniqueId());
+        }
 
-            if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
-                updateActionBar(target);
+        final Player target = plugin.getServer().getPlayer(data.getTargetUUID());
+
+        // 记录统计
+        long duration = (System.currentTimeMillis() - data.getStartTime()) / 1000;
+        plugin.getStatisticsManager().recordPeekEnd(peeker, duration);
+
+        // 设置冷却
+        plugin.getCooldownManager().setCooldown(peeker);
+
+        // 停止距离检查器并移除 BossBar
+        stopRangeCheckerAndBossBar(peeker);
+
+        if (shouldRestore && peeker.isOnline()) {
+            if (peeker.isDead()) {
+                startRespawnWatcher(peeker, data);
+            } else {
+                // 玩家未死亡，直接恢复状态
+                stateRestorer.restorePlayerState(peeker, data);
             }
+        }
+
+        // 发送消息
+        if (peeker.isOnline()) {
+            plugin.getMessages().send(peeker, "peek-end");
+        }
+
+        // 检查是否是自我观察模式
+        boolean isSelfPeek = target != null && target.getUniqueId().equals(peeker.getUniqueId());
+        boolean silentPeek = peeker.isOnline() && plugin.getTargetHandler().shouldSilentPeek(peeker);
+
+        // 非自我观察且非静默模式才通知目标（此时 peeker 已从 activePeeks 移除，actionbar 计数已正确）
+        if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
+            plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
+            playSound(target, "end-peek");
+            updateActionBar(target);
         }
     }
 
@@ -244,32 +242,55 @@ public class PeekStateHandler {
     // ==================== 私有方法 ====================
 
     private void teleportAndSetGameMode(Player peeker, Player target) {
+        // 捕获当前会话数据。后续延迟任务执行前都会校验该会话是否仍然有效，
+        // 防止在玩家已退出观察后仍把他切成/留在旁观者模式（卡旁观者）。
+        final PeekData data = activePeeks.get(peeker.getUniqueId());
+        if (data == null) {
+            return;
+        }
+
         final Runnable onFailed = () -> {
             plugin.getMessages().send(peeker, "teleport-failed");
             endPeek(peeker);
         };
 
-        // 先切换游戏模式
+        // 第一步：切换游戏模式（延迟 1 tick）
         final boolean firstRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+            // 会话已结束/正在退出：放弃进入旁观模式，避免卡旁观者
+            if (sessionEnded(peeker, data)) {
+                return;
+            }
+
             // 清理骑乘状态，准备进入旁观者模式
             PlayerStateUtil.prepareForSpectatorMode(peeker);
 
             // 设置为旁观模式
             peeker.setGameMode(GameMode.SPECTATOR);
 
-            // 等待2 tick后再传送
+            // 第二步：等待 2 tick 后再传送
             final boolean secondRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+                // 等待期间会话结束：兜底恢复，绝不留在旁观模式
+                if (sessionEnded(peeker, data)) {
+                    recoverEndedSession(peeker, data);
+                    return;
+                }
+
                 peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
                     if (!success) {
                         onFailed.run();
-                    } else {
-                        // teleportAsync 的回调线程不确定
-                        // 使用 peeker 的实体调度器确保在正确的区域线程执行
-                        peeker.getScheduler().run(plugin, scheduledTask -> {
-                            bossBarHandler.createDistanceBossBar(peeker, target);
-                            startNormalRangeChecker(peeker, target);
-                        }, () -> logDebug("Peeker %s went offline after teleport", peeker.getName()));
+                        return;
                     }
+                    // teleportAsync 的回调线程不确定
+                    // 使用 peeker 的实体调度器确保在正确的区域线程执行
+                    peeker.getScheduler().run(plugin, scheduledTask -> {
+                        // 传送完成后会话已结束：回退恢复，避免以原游戏模式停留在目标位置
+                        if (sessionEnded(peeker, data)) {
+                            recoverEndedSession(peeker, data);
+                            return;
+                        }
+                        bossBarHandler.createDistanceBossBar(peeker, target);
+                        startNormalRangeChecker(peeker, target);
+                    }, () -> logDebug("Peeker %s went offline after teleport", peeker.getName()));
                 }).exceptionally(ex -> {
                     plugin.getLogger().warning(String.format("传送玩家 %s 时发生异常: %s", peeker.getName(), ex.getMessage()));
                     onFailed.run();
@@ -284,6 +305,35 @@ public class PeekStateHandler {
 
         if (!firstRoundScheduled) {
             onFailed.run();
+        }
+    }
+
+    /**
+     * 判断指定玩家的 Peek 会话是否已结束（正在退出，或已从活跃表中被移除/替换）。
+     */
+    private boolean sessionEnded(Player peeker, PeekData data) {
+        return data.isExiting() || activePeeks.get(peeker.getUniqueId()) != data;
+    }
+
+    /**
+     * 会话在延迟任务执行期间结束时的兜底恢复，
+     * 确保玩家不会卡在旁观模式或停留在目标位置。
+     */
+    private void recoverEndedSession(Player peeker, PeekData data) {
+        if (!peeker.isOnline()) {
+            return;
+        }
+        // 玩家已不在旁观模式：说明 endPeek 等路径已完成恢复，无需重复处理，
+        // 避免双重恢复 / 重复传送。仅当玩家确实还卡在旁观模式时才介入。
+        if (peeker.getGameMode() != GameMode.SPECTATOR) {
+            return;
+        }
+        logDebug("Session for %s ended mid-start; recovering player state", peeker.getName());
+        if (peeker.isDead()) {
+            // 死亡时交给重生监视器，重生后再恢复，避免对尸体设置状态
+            startRespawnWatcher(peeker, data);
+        } else {
+            stateRestorer.restorePlayerState(peeker, data);
         }
     }
 

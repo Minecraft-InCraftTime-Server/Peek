@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /e/GitHub-Repo/Peek/src/main/java/ict/minesunshineone/peek/**/*.java)",
+      "Bash(mvn clean:*)"
+    ]
+  }
+}
