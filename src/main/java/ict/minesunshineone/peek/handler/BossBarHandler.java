@@ -211,8 +211,6 @@ public class BossBarHandler {
     }
 
     private void logDebug(String message, Object... args) {
-        if (plugin.getConfig().getBoolean("debug", false)) {
-            plugin.getLogger().info(String.format(message, args));
-        }
+        plugin.logDebug(message, args);
     }
 }

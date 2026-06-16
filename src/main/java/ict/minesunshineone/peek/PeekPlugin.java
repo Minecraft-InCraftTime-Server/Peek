@@ -125,12 +125,12 @@ public class PeekPlugin extends JavaPlugin {
                             // applyRestoredState 失败时状态文件保留，下次登录时 onPlayerJoin 自动恢复
                         }
                     } else {
-                        // 传送失败：至少恢复游戏模式，确保玩家绝不会卡在旁观模式；
-                        // 同时保留状态文件，下次登录时由 onPlayerJoin 传送回原位置完成完整恢复
+                        // 传送失败：原地恢复完整状态（游戏模式/生命/饥饿/药水），确保玩家绝不会卡在旁观模式；
+                        // 保留状态文件，下次登录时由 onPlayerJoin 传送回原位置完成完整恢复
                         try {
-                            player.setGameMode(data.getOriginalGameMode());
+                            stateHandler.getStateRestorer().applyStateInPlace(player, data);
                         } catch (Throwable t) {
-                            getLogger().warning(String.format("关服时无法恢复玩家 %s 的游戏模式，将在重连时恢复: %s",
+                            getLogger().warning(String.format("关服时无法恢复玩家 %s 的状态，将在重连时恢复: %s",
                                     player.getName(), t.getMessage()));
                         }
                     }
@@ -232,6 +232,16 @@ public class PeekPlugin extends JavaPlugin {
 
     public StatisticsManager getStatisticsManager() {
         return statisticsManager;
+    }
+
+    /**
+     * 调试模式下输出日志（仅当配置 debug=true 时）。
+     * 各处理器共用此实现，避免重复的调试日志样板代码。
+     */
+    public void logDebug(String message, Object... args) {
+        if (getConfig().getBoolean("debug", false)) {
+            getLogger().info(String.format(message, args));
+        }
     }
 
     /**

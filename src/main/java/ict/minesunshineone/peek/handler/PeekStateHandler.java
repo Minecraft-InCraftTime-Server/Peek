@@ -210,12 +210,7 @@ public class PeekStateHandler {
         stopRangeCheckerAndBossBar(peeker);
 
         if (shouldRestore && peeker.isOnline()) {
-            if (peeker.isDead()) {
-                startRespawnWatcher(peeker, data);
-            } else {
-                // 玩家未死亡，直接恢复状态
-                stateRestorer.restorePlayerState(peeker, data);
-            }
+            restoreOrWatch(peeker, data);
         }
 
         // 发送消息
@@ -323,14 +318,25 @@ public class PeekStateHandler {
         if (!peeker.isOnline()) {
             return;
         }
+        // 玩家已开始新的观察会话：绝不能用旧会话数据干预，否则会把正在观察的玩家
+        // 拽回旧会话的原始位置并破坏新会话。此时新会话自行负责玩家状态。
+        if (activePeeks.containsKey(peeker.getUniqueId())) {
+            return;
+        }
         // 玩家已不在旁观模式：说明 endPeek 等路径已完成恢复，无需重复处理，
         // 避免双重恢复 / 重复传送。仅当玩家确实还卡在旁观模式时才介入。
         if (peeker.getGameMode() != GameMode.SPECTATOR) {
             return;
         }
         logDebug("Session for %s ended mid-start; recovering player state", peeker.getName());
+        restoreOrWatch(peeker, data);
+    }
+
+    /**
+     * 根据玩家是否死亡选择恢复方式：死亡则等待重生后恢复（避免对尸体设置状态），否则立即恢复。
+     */
+    private void restoreOrWatch(Player peeker, PeekData data) {
         if (peeker.isDead()) {
-            // 死亡时交给重生监视器，重生后再恢复，避免对尸体设置状态
             startRespawnWatcher(peeker, data);
         } else {
             stateRestorer.restorePlayerState(peeker, data);
@@ -338,16 +344,18 @@ public class PeekStateHandler {
     }
 
     private void setSelfPeekGameMode(Player peeker) {
+        // 捕获当前会话，延迟任务执行前校验其有效性，防止会话已结束仍切入旁观模式（卡旁观者）
+        final PeekData data = activePeeks.get(peeker.getUniqueId());
+        if (data == null) {
+            return;
+        }
         peeker.getScheduler().execute(plugin, () -> {
             // 这里如果玩家离线了调度器会自动退役
-            /*
-             * if (!peeker.isOnline()) {
-             * plugin.getLogger().warning(String.format("玩家 %s 在设置自我观察模式时已离线",
-             * peeker.getName()));
-             * endPeek(peeker, false);
-             * return;
-             * }
-             */
+
+            // 会话已结束/正在退出：放弃进入旁观模式，避免卡旁观者
+            if (sessionEnded(peeker, data)) {
+                return;
+            }
 
             if (peeker.isDead()) {
                 plugin.getSLF4JLogger().warn("玩家 {} 在设置自我观察模式时已死亡", peeker.getName());
@@ -443,9 +451,7 @@ public class PeekStateHandler {
     }
 
     private void logDebug(String message, Object... args) {
-        if (plugin.getConfig().getBoolean("debug", false)) {
-            plugin.getLogger().info(String.format(message, args));
-        }
+        plugin.logDebug(message, args);
     }
 
     // ==================== 公共查询方法 ====================

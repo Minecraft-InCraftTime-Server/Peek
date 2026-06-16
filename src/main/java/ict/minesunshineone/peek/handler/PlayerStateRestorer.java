@@ -31,8 +31,6 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void restorePlayerState(Player peeker, PeekData data) {
-        final Runnable onFailed = () -> handleTeleportFailure(peeker, data);
-
         // 原始位置所在世界可能已被卸载/删除，导致 teleportAsync 同步抛出 IllegalArgumentException。
         // 这种异常既不会进入 thenAccept/exceptionally，也不会触发离线回调，
         // 会让玩家永久卡在旁观模式。因此提前校验，必要时回退到重生点恢复。
@@ -44,15 +42,26 @@ public class PlayerStateRestorer {
             return;
         }
 
+        teleportThenRestore(peeker, originalLocation, data, () -> handleTeleportFailure(peeker, data));
+    }
+
+    /**
+     * 在实体调度器上把玩家异步传送到指定位置，成功后应用恢复状态；
+     * 任何失败路径（teleportAsync 同步抛出、异步异常、返回 false、调度器退役）都会执行 onFailed。
+     *
+     * @param peeker      观察者
+     * @param destination 目标位置（调用方需保证世界非空）
+     * @param data        PeekData 数据
+     * @param onFailed    传送失败时的回退逻辑
+     */
+    private void teleportThenRestore(Player peeker, Location destination, PeekData data, Runnable onFailed) {
         final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
             try {
-                // 强制清理任何骑乘/附身状态，防止卡在旁观者模式
+                // 强制清理骑乘/附身状态并清除动量，保证传送干净
                 PlayerStateUtil.forceExitRidingState(peeker);
-
-                // 在传送前先清除动量
                 peeker.setVelocity(ZERO_VECTOR);
 
-                peeker.teleportAsync(originalLocation, TeleportCause.PLUGIN).thenAccept(success -> {
+                peeker.teleportAsync(destination, TeleportCause.PLUGIN).thenAccept(success -> {
                     if (success) {
                         // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
                         peeker.getScheduler().run(plugin,
@@ -100,33 +109,7 @@ public class PlayerStateRestorer {
         };
 
         if (spawnLoc != null && spawnLoc.getWorld() != null) {
-            final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
-                try {
-                    peeker.teleportAsync(spawnLoc, TeleportCause.PLUGIN).thenAccept(spawnSuccess -> {
-                        if (spawnSuccess) {
-                            // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
-                            peeker.getScheduler().run(plugin,
-                                    scheduledTask -> applyRestoredState(peeker, data),
-                                    () -> plugin.getLogger().warning(
-                                            String.format("玩家 %s 在重生点传送恢复后离线", peeker.getName())));
-                        } else {
-                            onFailed.run();
-                        }
-                    }).exceptionally(ex -> {
-                        plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时发生异常: %s", peeker.getName(), ex.getMessage()));
-                        onFailed.run();
-                        return null;
-                    });
-                } catch (Throwable t) {
-                    // 即使重生点传送同步抛出，也要强制恢复游戏模式，绝不卡旁观者
-                    plugin.getLogger().warning(String.format("传送玩家 %s 到重生点时同步异常: %s", peeker.getName(), t.getMessage()));
-                    onFailed.run();
-                }
-            }, onFailed, 1L);
-
-            if (!scheduled) {
-                onFailed.run();
-            }
+            teleportThenRestore(peeker, spawnLoc, data, onFailed);
         } else {
             onFailed.run();
         }
@@ -178,10 +161,22 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void applyRestoredState(Player peeker, PeekData data) {
-        // 再次确保动量为0
-        peeker.setVelocity(new Vector(0, 0, 0));
+        applyStateInPlace(peeker, data);
 
-        // 再次强制清理骑乘/附身状态，确保万无一失
+        // 游戏模式已恢复，现在安全地清除状态文件
+        plugin.getStateManager().clearPlayerState(peeker);
+    }
+
+    /**
+     * 原地恢复玩家状态（不传送、不清除状态文件）。
+     * 用于关服等无法传送但仍需确保玩家退出旁观模式的场景；保留状态文件以便重连时完成完整恢复。
+     *
+     * @param peeker 观察者
+     * @param data   PeekData 数据
+     */
+    public void applyStateInPlace(Player peeker, PeekData data) {
+        // 再次确保动量为0并清理骑乘/附身状态，确保万无一失
+        peeker.setVelocity(ZERO_VECTOR);
         PlayerStateUtil.forceExitRidingState(peeker);
 
         peeker.setGameMode(data.getOriginalGameMode());
@@ -193,9 +188,6 @@ public class PlayerStateRestorer {
         // 清除现有效果并应用保存的效果
         peeker.getActivePotionEffects().forEach(effect -> peeker.removePotionEffect(effect.getType()));
         data.getPotionEffects().forEach(effect -> peeker.addPotionEffect(effect));
-
-        // 游戏模式已恢复，现在安全地清除状态文件
-        plugin.getStateManager().clearPlayerState(peeker);
     }
 
     /**

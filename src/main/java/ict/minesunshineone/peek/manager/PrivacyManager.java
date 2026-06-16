@@ -78,35 +78,66 @@ public class PrivacyManager {
     }
 
     /**
-     * 取消玩家的所有待处理请求
+     * 取消玩家的所有待处理请求（既包括以其为目标的，也包括其作为请求者发出的）
      */
     private synchronized void cancelAllPendingRequests(Player player) {
         UUID playerUuid = player.getUniqueId();
-        
-        // 取消作为目标的所有请求
-        Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(playerUuid);
-        if (targetRequests != null) {
-            for (Map.Entry<UUID, ScheduledTask> entry : targetRequests.entrySet()) {
-                entry.getValue().cancel();
+        cancelIncomingRequests(playerUuid, "request-cancel");
+        cancelOutgoingRequests(playerUuid, "request-cancel");
+    }
+
+    /**
+     * 取消所有以指定玩家为目标（外层 key）的待处理请求，按需通知请求者。
+     *
+     * @param targetUuid          目标玩家 UUID
+     * @param requesterMessageKey 通知请求者的消息键，为 null 则不通知
+     */
+    private void cancelIncomingRequests(UUID targetUuid, String requesterMessageKey) {
+        Map<UUID, ScheduledTask> targetRequests = pendingRequests.remove(targetUuid);
+        if (targetRequests == null) {
+            return;
+        }
+        for (Map.Entry<UUID, ScheduledTask> entry : targetRequests.entrySet()) {
+            entry.getValue().cancel();
+            if (requesterMessageKey != null) {
                 Player requester = plugin.getServer().getPlayer(entry.getKey());
                 if (requester != null && requester.isOnline()) {
-                    plugin.getMessages().send(requester, "request-cancel");
+                    plugin.getMessages().send(requester, requesterMessageKey);
                 }
             }
-            pendingRequests.remove(playerUuid);
         }
-        
-        // 取消作为请求者的所有请求
-        for (Map.Entry<UUID, Map<UUID, ScheduledTask>> entry : pendingRequests.entrySet()) {
-            ScheduledTask task = entry.getValue().remove(playerUuid);
-            if (task != null) {
-                task.cancel();
+    }
+
+    /**
+     * 取消指定玩家作为请求者发出的所有待处理请求，按需通知目标。
+     *
+     * @param peekerUuid       请求者 UUID
+     * @param targetMessageKey 通知目标的消息键，为 null 则不通知
+     * @return 是否取消了任何请求
+     */
+    private boolean cancelOutgoingRequests(UUID peekerUuid, String targetMessageKey) {
+        boolean cancelledAny = false;
+        Iterator<Map.Entry<UUID, Map<UUID, ScheduledTask>>> it = pendingRequests.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Map<UUID, ScheduledTask>> entry = it.next();
+            Map<UUID, ScheduledTask> requests = entry.getValue();
+            ScheduledTask task = requests.remove(peekerUuid);
+            if (task == null) {
+                continue;
+            }
+            task.cancel();
+            cancelledAny = true;
+            if (targetMessageKey != null) {
                 Player target = plugin.getServer().getPlayer(entry.getKey());
                 if (target != null && target.isOnline()) {
-                    plugin.getMessages().send(target, "request-cancel");
+                    plugin.getMessages().send(target, targetMessageKey);
                 }
             }
+            if (requests.isEmpty()) {
+                it.remove();
+            }
         }
+        return cancelledAny;
     }
 
     public void sendPeekRequest(Player peeker, Player target) {
@@ -259,27 +290,14 @@ public class PrivacyManager {
 
     public synchronized void cancelAllRequests(Player player) {
         UUID playerUuid = player.getUniqueId();
+        // 玩家退出：取消其相关的所有请求，不发送通知（双方多半已离线）
+        cancelIncomingRequests(playerUuid, null);
+        cancelOutgoingRequests(playerUuid, null);
 
-        // 取消作为目标的请求
-        Map<UUID, ScheduledTask> targetRequests = pendingRequests.remove(playerUuid);
-        if (targetRequests != null) {
-            targetRequests.values().forEach(ScheduledTask::cancel);
-        }
-
-        // 取消作为请求者的请求
-        pendingRequests.values().forEach(requests -> {
-            ScheduledTask task = requests.remove(playerUuid);
-            if (task != null) {
-                task.cancel();
-            }
-        });
-
-        // 清理空的映射
-        pendingRequests.values().removeIf(Map::isEmpty);
-
-        // 清理该玩家相关的请求冷却记录，避免离线玩家的键长期堆积
-        String uuidStr = playerUuid.toString();
-        requestCooldowns.keySet().removeIf(key -> key.contains(uuidStr));
+        // 顺便清理所有已过期的请求冷却记录，避免无限增长。
+        // 注意：只删除已过期的条目，不删除仍生效的冷却，否则玩家可通过重连绕过冷却。
+        long now = System.currentTimeMillis();
+        requestCooldowns.values().removeIf(ts -> now - ts >= cooldownDuration * 1000L);
     }
 
     public synchronized void handleAccept(Player player) {
@@ -328,24 +346,9 @@ public class PrivacyManager {
      * 直接在锁内操作，避免对外暴露内部可变映射导致的并发问题。
      */
     public synchronized void cancelRequestsByPeekerOnDeath(Player peeker) {
-        UUID peekerUuid = peeker.getUniqueId();
-        Iterator<Map.Entry<UUID, Map<UUID, ScheduledTask>>> it = pendingRequests.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, Map<UUID, ScheduledTask>> entry = it.next();
-            Map<UUID, ScheduledTask> requests = entry.getValue();
-            ScheduledTask task = requests.remove(peekerUuid);
-            if (task == null) {
-                continue;
-            }
-            task.cancel();
+        // 只给死亡的请求者发送一次提示，即使其有多个待处理请求
+        if (cancelOutgoingRequests(peeker.getUniqueId(), "request-cancelled-death-target")) {
             plugin.getMessages().send(peeker, "request-cancelled-death");
-            Player target = plugin.getServer().getPlayer(entry.getKey());
-            if (target != null && target.isOnline()) {
-                plugin.getMessages().send(target, "request-cancelled-death-target");
-            }
-            if (requests.isEmpty()) {
-                it.remove();
-            }
         }
     }
 }
