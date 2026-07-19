@@ -3,7 +3,6 @@ package ict.minesunshineone.peek.command;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import org.bukkit.command.Command;
@@ -65,17 +64,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handlePeek(Player peeker, String targetName) {
-        if (!plugin.getTargetHandler().canPeek(peeker, targetName)) {
-            return true;
-        }
-
-        Player target = plugin.getServer().getPlayer(targetName);
-        if (target == null) {
-            plugin.getMessages().send(peeker, "player-not-found", "player", targetName);
-            return true;
-        }
-
-        plugin.getStateHandler().startPeek(peeker, target);
+        plugin.getTargetHandler().requestPeek(peeker, targetName);
         return true;
     }
 
@@ -141,46 +130,7 @@ public class PeekCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleRandomPeek(Player player) {
-        // 检查玩家是否已经在peek状态
-        if (plugin.getStateHandler().getActivePeeks().containsKey(player.getUniqueId())) {
-            plugin.getMessages().send(player, "already-peeking");
-            return true;
-        }
-
-        // 检查玩家是否死亡
-        if (player.isDead()) {
-            plugin.getMessages().send(player, "cannot-peek-while-dead");
-            return true;
-        }
-
-        // 检查冷却时间
-        if (plugin.getCooldownManager().isOnCooldown(player)) {
-            plugin.getMessages().send(player, "cooldown-peek", "time",
-                    String.valueOf(plugin.getCooldownManager().getRemainingCooldown(player)));
-            return true;
-        }
-
-        // 获取所有可用的目标玩家（排除自己、私密模式玩家、死亡玩家）
-        // 注意：允许 peek 正在 peek 别人的玩家
-        List<Player> availableTargets = plugin.getServer().getOnlinePlayers().stream()
-                .filter(p -> !p.equals(player)) // 排除自己
-                .filter(p -> !plugin.getPrivacyManager().isPrivateMode(p)) // 排除私密模式玩家
-                .filter(p -> !p.isDead()) // 排除死亡玩家
-                .collect(Collectors.toList());
-
-        if (availableTargets.isEmpty()) {
-            plugin.getMessages().send(player, "no-available-random-target");
-            return true;
-        }
-
-        // 随机选择一个目标
-        Player target = availableTargets.get(ThreadLocalRandom.current().nextInt(availableTargets.size()));
-
-        // 发送随机选择提示
-        plugin.getMessages().send(player, "random-peek-selected", "player", target.getName());
-
-        // 开始 peek
-        plugin.getStateHandler().startPeek(player, target);
+        plugin.getTargetHandler().requestRandomPeek(player);
         return true;
     }
 

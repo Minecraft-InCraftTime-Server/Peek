@@ -13,6 +13,7 @@ import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
+import ict.minesunshineone.peek.util.FoliaSchedulerUtil;
 import ict.minesunshineone.peek.util.PlayerStateUtil;
 
 /**
@@ -41,9 +42,19 @@ public class PeekStateHandler {
     /**
      * 开始 Peek 另一个玩家
      */
-    public void startPeek(Player peeker, Player target) {
+    public void startPeek(Player peeker, Player target, String targetName) {
         if (peeker == null || target == null) {
             plugin.getLogger().warning("尝试对空玩家使用贴贴功能");
+            return;
+        }
+
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> startPeekOnPeekerThread(peeker, target, targetName),
+                () -> markPeekInactive(peeker.getUniqueId()));
+    }
+
+    private void startPeekOnPeekerThread(Player peeker, Player target, String targetName) {
+        if (!peeker.isOnline()) {
+            plugin.getLogger().warning(String.format("尝试对离线玩家 %s 使用贴贴功能", peeker.getName()));
             return;
         }
 
@@ -61,7 +72,7 @@ public class PeekStateHandler {
                 return;
             }
 
-            logDebug("Starting peek: %s -> %s", peeker.getName(), target.getName());
+            logDebug("Starting peek: %s -> %s", peeker.getName(), targetName);
             data = new PeekData(
                     peeker.getLocation().clone(),
                     peeker.getGameMode(),
@@ -78,19 +89,17 @@ public class PeekStateHandler {
         plugin.getStateManager().savePlayerState(peeker, data);
         plugin.getStatisticsManager().recordPeekStart(peeker, target);
 
-        teleportAndSetGameMode(peeker, target);
+        teleportAndSetGameMode(peeker, target, targetName);
 
         // 检查是否静默 peek（有 bypass 权限）
         boolean silentPeek = plugin.getTargetHandler().shouldSilentPeek(peeker);
 
         // 发送消息给观察者
-        plugin.getMessages().send(peeker, "peek-start", "player", target.getName());
+        plugin.getMessages().send(peeker, "peek-start", "player", targetName);
 
         // 只有非静默模式才通知目标
         if (!silentPeek) {
-            plugin.getMessages().send(target, "being-peeked", "player", peeker.getName());
-            playSound(target, "start-peek");
-            updateActionBar(target);
+            notifyTargetPeekStarted(target, peeker.getName());
         }
     }
 
@@ -103,6 +112,11 @@ public class PeekStateHandler {
             return;
         }
 
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> startSelfPeekOnPeekerThread(peeker),
+                () -> markPeekInactive(peeker.getUniqueId()));
+    }
+
+    private void startSelfPeekOnPeekerThread(Player peeker) {
         // 添加死亡检查
         if (peeker.isDead()) {
             plugin.getMessages().send(peeker, "cannot-peek-while-dead");
@@ -116,62 +130,64 @@ public class PeekStateHandler {
         }
 
         // 防止并发修改
+        final PeekData data;
+        final Location originalLocation;
         synchronized (activePeeks) {
             if (activePeeks.containsKey(peeker.getUniqueId())) {
                 plugin.getMessages().send(peeker, "already-peeking");
                 return;
             }
 
-            try {
-                logDebug("Starting self peek: %s", peeker.getName());
+            logDebug("Starting self peek: %s", peeker.getName());
 
-                // 保存当前位置作为原始位置
-                Location originalLocation = peeker.getLocation().clone();
+            // 保存当前位置作为原始位置
+            originalLocation = peeker.getLocation().clone();
 
-                // 创建特殊的 PeekData，目标设为自己
-                PeekData data = new PeekData(
-                        originalLocation,
-                        peeker.getGameMode(),
-                        peeker.getUniqueId(), // 目标设为自己
-                        System.currentTimeMillis(),
-                        peeker.getHealth(),
-                        peeker.getFoodLevel(),
-                        peeker.getSaturation(),
-                        peeker.getActivePotionEffects());
+            // 创建特殊的 PeekData，目标设为自己
+            data = new PeekData(
+                    originalLocation,
+                    peeker.getGameMode(),
+                    peeker.getUniqueId(), // 目标设为自己
+                    System.currentTimeMillis(),
+                    peeker.getHealth(),
+                    peeker.getFoodLevel(),
+                    peeker.getSaturation(),
+                    peeker.getActivePotionEffects());
 
-                activePeeks.put(peeker.getUniqueId(), data);
-                plugin.getStateManager().savePlayerState(peeker, data);
-                plugin.getStatisticsManager().recordPeekStart(peeker, peeker); // 统计中目标也是自己
+            activePeeks.put(peeker.getUniqueId(), data);
+        }
 
-                // 设置为观察者模式但不传送
-                setSelfPeekGameMode(peeker);
+        try {
+            plugin.getStateManager().savePlayerState(peeker, data);
+            plugin.getStatisticsManager().recordPeekStart(peeker, peeker); // 统计中目标也是自己
 
-                // 发送消息
-                plugin.getMessages().send(peeker, "self-peek-start");
+            // 设置为观察者模式但不传送
+            setSelfPeekGameMode(peeker);
 
-                // 播放声音
-                playSound(peeker, "start-peek");
+            // 发送消息
+            plugin.getMessages().send(peeker, "self-peek-start");
 
-                // 启动self距离检查器，确保不会超出距离限制
-                // 创建 BossBar 并启动自我观察距离检查器
-                bossBarHandler.createSelfPeekBossBar(peeker, plugin.getMessages().get("self-peek-origin", "原点"));
-                startSelfRangeChecker(peeker, originalLocation);
+            // 播放声音
+            playSound(peeker, "start-peek");
 
-                logDebug("Self peek started successfully for player: %s", peeker.getName());
+            // 启动self距离检查器，确保不会超出距离限制
+            // 创建 BossBar 并启动自我观察距离检查器
+            bossBarHandler.createSelfPeekBossBar(peeker, plugin.getMessages().get("self-peek-origin", "原点"));
+            startSelfRangeChecker(peeker, originalLocation);
 
-            } catch (Exception e) {
-                plugin.getLogger()
-                        .warning(String.format("启动自我观察时发生错误，玩家: %s，错误: %s", peeker.getName(), e.getMessage()));
-                if (plugin.getConfig().getBoolean("debug", false)) {
-                    e.printStackTrace();
-                }
-
-                // 清理可能的残留状态
-                activePeeks.remove(peeker.getUniqueId());
-                // 通知玩家发生错误
-                rangeChecker.stopRangeChecker(peeker);
-                plugin.getMessages().send(peeker, "command-error");
+            logDebug("Self peek started successfully for player: %s", peeker.getName());
+        } catch (Exception e) {
+            plugin.getLogger()
+                    .warning(String.format("启动自我观察时发生错误，玩家: %s，错误: %s", peeker.getName(), e.getMessage()));
+            if (plugin.getConfig().getBoolean("debug", false)) {
+                e.printStackTrace();
             }
+
+            // 清理可能的残留状态
+            markPeekInactive(peeker.getUniqueId());
+            rangeChecker.stopRangeChecker(peeker);
+            bossBarHandler.safeRemoveDistanceBossBar(peeker);
+            plugin.getMessages().send(peeker, "command-error");
         }
     }
 
@@ -184,6 +200,11 @@ public class PeekStateHandler {
             return;
         }
 
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> endPeekOnPeekerThread(peeker, shouldRestore),
+                () -> markPeekInactive(peeker.getUniqueId()));
+    }
+
+    private void endPeekOnPeekerThread(Player peeker, boolean shouldRestore) {
         // 仅在锁内完成"领取退出权"：判定 + 标记 + 移除。
         // 随后的恢复、传送、消息都在锁外执行，避免长时间持有 activePeeks 锁，
         // 从而消除与 RangeChecker 锁之间的顺序反转死锁风险。
@@ -223,10 +244,8 @@ public class PeekStateHandler {
         boolean silentPeek = peeker.isOnline() && plugin.getTargetHandler().shouldSilentPeek(peeker);
 
         // 非自我观察且非静默模式才通知目标（此时 peeker 已从 activePeeks 移除，actionbar 计数已正确）
-        if (target != null && target.isOnline() && !isSelfPeek && !silentPeek) {
-            plugin.getMessages().send(target, "peek-end-target", "player", peeker.getName());
-            playSound(target, "end-peek");
-            updateActionBar(target);
+        if (target != null && !isSelfPeek && !silentPeek) {
+            notifyTargetPeekEnded(target, peeker.getName());
         }
     }
 
@@ -236,7 +255,7 @@ public class PeekStateHandler {
 
     // ==================== 私有方法 ====================
 
-    private void teleportAndSetGameMode(Player peeker, Player target) {
+    private void teleportAndSetGameMode(Player peeker, Player target, String targetName) {
         // 捕获当前会话数据。后续延迟任务执行前都会校验该会话是否仍然有效，
         // 防止在玩家已退出观察后仍把他切成/留在旁观者模式（卡旁观者）。
         final PeekData data = activePeeks.get(peeker.getUniqueId());
@@ -244,13 +263,10 @@ public class PeekStateHandler {
             return;
         }
 
-        final Runnable onFailed = () -> {
-            plugin.getMessages().send(peeker, "teleport-failed");
-            endPeek(peeker);
-        };
+        final Runnable onFailed = () -> failActivePeek(peeker, "teleport-failed");
 
         // 第一步：切换游戏模式（延迟 1 tick）
-        final boolean firstRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+        FoliaSchedulerUtil.executeOnEntity(plugin, peeker, () -> {
             // 会话已结束/正在退出：放弃进入旁观模式，避免卡旁观者
             if (sessionEnded(peeker, data)) {
                 return;
@@ -263,42 +279,65 @@ public class PeekStateHandler {
             peeker.setGameMode(GameMode.SPECTATOR);
 
             // 第二步：等待 2 tick 后再传送
-            final boolean secondRoundScheduled = peeker.getScheduler().execute(plugin, () -> {
+            FoliaSchedulerUtil.executeOnEntity(plugin, peeker, () -> {
                 // 等待期间会话结束：兜底恢复，绝不留在旁观模式
                 if (sessionEnded(peeker, data)) {
                     recoverEndedSession(peeker, data);
                     return;
                 }
 
-                peeker.teleportAsync(target.getLocation(), TeleportCause.PLUGIN).thenAccept(success -> {
-                    if (!success) {
-                        onFailed.run();
-                        return;
-                    }
-                    // teleportAsync 的回调线程不确定
-                    // 使用 peeker 的实体调度器确保在正确的区域线程执行
-                    peeker.getScheduler().run(plugin, scheduledTask -> {
-                        // 传送完成后会话已结束：回退恢复，避免以原游戏模式停留在目标位置
-                        if (sessionEnded(peeker, data)) {
-                            recoverEndedSession(peeker, data);
-                            return;
-                        }
-                        bossBarHandler.createDistanceBossBar(peeker, target);
-                        startNormalRangeChecker(peeker, target);
-                    }, () -> logDebug("Peeker %s went offline after teleport", peeker.getName()));
-                }).exceptionally(ex -> {
-                    plugin.getLogger().warning(String.format("传送玩家 %s 时发生异常: %s", peeker.getName(), ex.getMessage()));
-                    onFailed.run();
-                    return null;
-                });
+                teleportToTargetLocation(peeker, target, targetName, data, onFailed);
             }, onFailed, 2L); // 2 tick 延迟
 
-            if (!secondRoundScheduled) {
-                onFailed.run();
-            }
         }, onFailed, 1L);
+    }
 
-        if (!firstRoundScheduled) {
+    private void teleportToTargetLocation(Player peeker, Player target, String targetName, PeekData data,
+            Runnable onFailed) {
+        FoliaSchedulerUtil.runOnEntity(plugin, target, () -> {
+            if (!target.isOnline()) {
+                onFailed.run();
+                return;
+            }
+
+            Location targetLocation = target.getLocation().clone();
+            FoliaSchedulerUtil.runOnEntity(plugin, peeker,
+                    () -> teleportPeekerToLocation(peeker, target, targetName, targetLocation, data, onFailed),
+                    () -> markPeekInactive(peeker.getUniqueId()));
+        }, onFailed);
+    }
+
+    private void teleportPeekerToLocation(Player peeker, Player target, String targetName, Location targetLocation,
+            PeekData data, Runnable onFailed) {
+        if (sessionEnded(peeker, data)) {
+            recoverEndedSession(peeker, data);
+            return;
+        }
+
+        try {
+            peeker.teleportAsync(targetLocation, TeleportCause.PLUGIN).thenAccept(success -> {
+                if (!success) {
+                    onFailed.run();
+                    return;
+                }
+                // teleportAsync 的回调线程不确定
+                // 使用 peeker 的实体调度器确保在正确的区域线程执行
+                FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> {
+                    // 传送完成后会话已结束：回退恢复，避免以原游戏模式停留在目标位置
+                    if (sessionEnded(peeker, data)) {
+                        recoverEndedSession(peeker, data);
+                        return;
+                    }
+                    bossBarHandler.createDistanceBossBar(peeker, targetName);
+                    startNormalRangeChecker(peeker, target, targetName);
+                }, () -> markPeekInactive(peeker.getUniqueId()));
+            }).exceptionally(ex -> {
+                plugin.getLogger().warning(String.format("传送玩家 %s 时发生异常: %s", peeker.getName(), ex.getMessage()));
+                onFailed.run();
+                return null;
+            });
+        } catch (Throwable t) {
+            plugin.getLogger().warning(String.format("传送玩家 %s 时同步异常: %s", peeker.getName(), t.getMessage()));
             onFailed.run();
         }
     }
@@ -349,7 +388,7 @@ public class PeekStateHandler {
         if (data == null) {
             return;
         }
-        peeker.getScheduler().execute(plugin, () -> {
+        FoliaSchedulerUtil.executeOnEntity(plugin, peeker, () -> {
             // 这里如果玩家离线了调度器会自动退役
 
             // 会话已结束/正在退出：放弃进入旁观模式，避免卡旁观者
@@ -372,11 +411,11 @@ public class PeekStateHandler {
             logDebug("Successfully set self peek game mode for player: %s", peeker.getName());
         }, () -> {
             plugin.getSLF4JLogger().warn("玩家 {} 在设置自我观察模式时已离线", peeker.getName());
-            endPeek(peeker, false);
+            markPeekInactive(peeker.getUniqueId());
         }, 1L);
     }
 
-    private void startNormalRangeChecker(Player peeker, Player target) {
+    private void startNormalRangeChecker(Player peeker, Player target, String targetName) {
         rangeChecker.startRangeChecker(peeker, target,
                 // 超出范围时
                 () -> {
@@ -386,15 +425,12 @@ public class PeekStateHandler {
                 // 目标离线时
                 () -> endPeek(peeker),
                 // 距离更新时
-                (distance) -> {
-                    PeekData data = activePeeks.get(peeker.getUniqueId());
-                    bossBarHandler.updateDistanceBossBar(peeker, distance, data);
-                },
+                (distance) -> bossBarHandler.updateDistanceBossBar(peeker, distance, targetName),
                 // 不同世界时 - 先停止旧的距离检查器，防止竞态重复触发
                 () -> {
                     rangeChecker.stopRangeChecker(peeker);
                     plugin.getMessages().send(peeker, "target-in-different-world");
-                    teleportAndSetGameMode(peeker, target);
+                    teleportAndSetGameMode(peeker, target, targetName);
                 });
     }
 
@@ -438,6 +474,48 @@ public class PeekStateHandler {
                 1L, 20L);
     }
 
+    private void failActivePeek(Player peeker, String messageKey) {
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> {
+            if (activePeeks.containsKey(peeker.getUniqueId())) {
+                plugin.getMessages().send(peeker, messageKey);
+            }
+            endPeekOnPeekerThread(peeker, true);
+        }, () -> markPeekInactive(peeker.getUniqueId()));
+    }
+
+    private void notifyTargetPeekStarted(Player target, String peekerName) {
+        FoliaSchedulerUtil.runOnEntity(plugin, target, () -> {
+            if (!target.isOnline()) {
+                return;
+            }
+
+            plugin.getMessages().send(target, "being-peeked", "player", peekerName);
+            playSound(target, "start-peek");
+            updateActionBarOnTargetThread(target);
+        }, null);
+    }
+
+    private void notifyTargetPeekEnded(Player target, String peekerName) {
+        FoliaSchedulerUtil.runOnEntity(plugin, target, () -> {
+            if (!target.isOnline()) {
+                return;
+            }
+
+            plugin.getMessages().send(target, "peek-end-target", "player", peekerName);
+            playSound(target, "end-peek");
+            updateActionBarOnTargetThread(target);
+        }, null);
+    }
+
+    private void markPeekInactive(UUID peekerUUID) {
+        synchronized (activePeeks) {
+            PeekData data = activePeeks.remove(peekerUUID);
+            if (data != null) {
+                data.setExiting(true);
+            }
+        }
+    }
+
     private void playSound(Player player, String soundKey) {
         String soundName = plugin.getConfig().getString("sounds." + soundKey);
         if (soundName != null) {
@@ -461,7 +539,7 @@ public class PeekStateHandler {
     }
 
     public void removeActivePeek(Player player) {
-        activePeeks.remove(player.getUniqueId());
+        markPeekInactive(player.getUniqueId());
     }
 
     public long getPeekerCount(UUID targetUUID) {
@@ -471,6 +549,10 @@ public class PeekStateHandler {
     }
 
     public void updateActionBar(Player target) {
+        FoliaSchedulerUtil.runOnEntity(plugin, target, () -> updateActionBarOnTargetThread(target), null);
+    }
+
+    private void updateActionBarOnTargetThread(Player target) {
         long peekerCount = getPeekerCount(target.getUniqueId());
         if (peekerCount > 0) {
             plugin.getMessages().sendActionBar(target, "being-peeked-actionbar",

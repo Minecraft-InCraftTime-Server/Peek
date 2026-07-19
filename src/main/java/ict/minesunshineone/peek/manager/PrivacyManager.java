@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
 import ict.minesunshineone.peek.PeekPlugin;
+import ict.minesunshineone.peek.util.FoliaSchedulerUtil;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PrivacyManager {
@@ -101,8 +102,8 @@ public class PrivacyManager {
             entry.getValue().cancel();
             if (requesterMessageKey != null) {
                 Player requester = plugin.getServer().getPlayer(entry.getKey());
-                if (requester != null && requester.isOnline()) {
-                    plugin.getMessages().send(requester, requesterMessageKey);
+                if (requester != null) {
+                    runForPlayer(requester, () -> plugin.getMessages().send(requester, requesterMessageKey));
                 }
             }
         }
@@ -129,8 +130,8 @@ public class PrivacyManager {
             cancelledAny = true;
             if (targetMessageKey != null) {
                 Player target = plugin.getServer().getPlayer(entry.getKey());
-                if (target != null && target.isOnline()) {
-                    plugin.getMessages().send(target, targetMessageKey);
+                if (target != null) {
+                    runForPlayer(target, () -> plugin.getMessages().send(target, targetMessageKey));
                 }
             }
             if (requests.isEmpty()) {
@@ -140,15 +141,16 @@ public class PrivacyManager {
         return cancelledAny;
     }
 
-    public void sendPeekRequest(Player peeker, Player target) {
+    public void sendPeekRequest(Player peeker, Player target, String peekerName, String targetName,
+            boolean bypassRequestCooldown) {
         // 添加请求前的检查
         if (!target.isOnline()) {
-            plugin.getMessages().send(peeker, "target-offline");
+            runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "target-offline"));
             return;
         }
 
         if (plugin.getStateHandler().getActivePeeks().containsKey(target.getUniqueId())) {
-            plugin.getMessages().send(peeker, "target-is-peeking");
+            runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "target-is-peeking"));
             return;
         }
 
@@ -156,31 +158,32 @@ public class PrivacyManager {
         UUID targetUuid = target.getUniqueId();
 
         // 检查冷却
-        if (isOnRequestCooldown(peeker, target)) {
-            plugin.getMessages().send(peeker, "request-cooldown",
-                    "time", String.valueOf(getRemainingRequestCooldown(peeker, target)));
+        if (isOnRequestCooldown(peeker.getUniqueId(), target.getUniqueId(), bypassRequestCooldown)) {
+            runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "request-cooldown",
+                    "time", String.valueOf(getRemainingRequestCooldown(peeker.getUniqueId(), target.getUniqueId(),
+                            bypassRequestCooldown))));
             return;
         }
 
         // 检查是否已有待处理请求
         if (hasPendingRequest(peeker, target)) {
-            plugin.getMessages().send(peeker, "request-already-pending");
+            runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "request-already-pending"));
             return;
         }
 
         // 发送请求
-        plugin.getMessages().send(target, "peek-request", "player", peeker.getName());
-        plugin.getMessages().send(peeker, "request-sent", "player", target.getName());
-
-        // 播放声音
-        playSound(target, "privacy.sounds.request");
+        runForPlayer(target, () -> {
+            plugin.getMessages().send(target, "peek-request", "player", peekerName);
+            playSound(target, "privacy.sounds.request");
+        });
+        runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "request-sent", "player", targetName));
 
         // 设置超时任务
         ScheduledTask timeoutTask = plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin,
                 task -> {
                     if (removePendingRequest(peeker, target)) {
-                        plugin.getMessages().send(peeker, "request-timeout");
-                        plugin.getMessages().send(target, "request-timeout-target");
+                        runForPlayer(peeker, () -> plugin.getMessages().send(peeker, "request-timeout"));
+                        runForPlayer(target, () -> plugin.getMessages().send(target, "request-timeout-target"));
                         setRequestCooldown(peeker, target);
                     }
                 },
@@ -202,11 +205,13 @@ public class PrivacyManager {
         removePendingRequest(peeker, target);
 
         if (accepted) {
-            playSound(peeker, "privacy.sounds.accept");
-            plugin.getStateHandler().startPeek(peeker, target);
+            runForPlayer(peeker, () -> playSound(peeker, "privacy.sounds.accept"));
+            plugin.getStateHandler().startPeek(peeker, target, target.getName());
         } else {
-            playSound(peeker, "privacy.sounds.deny");
-            plugin.getMessages().send(peeker, "request-denied");
+            runForPlayer(peeker, () -> {
+                playSound(peeker, "privacy.sounds.deny");
+                plugin.getMessages().send(peeker, "request-denied");
+            });
             setRequestCooldown(peeker, target);
         }
     }
@@ -217,13 +222,21 @@ public class PrivacyManager {
     }
 
     public synchronized boolean removePendingRequest(Player peeker, Player target) {
-        Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(target.getUniqueId());
+        if (peeker == null || target == null) {
+            return false;
+        }
+
+        return removePendingRequest(peeker.getUniqueId(), target.getUniqueId());
+    }
+
+    private synchronized boolean removePendingRequest(UUID peekerUuid, UUID targetUuid) {
+        Map<UUID, ScheduledTask> targetRequests = pendingRequests.get(targetUuid);
         if (targetRequests != null) {
-            ScheduledTask task = targetRequests.remove(peeker.getUniqueId());
+            ScheduledTask task = targetRequests.remove(peekerUuid);
             if (task != null) {
                 task.cancel();
                 if (targetRequests.isEmpty()) {
-                    pendingRequests.remove(target.getUniqueId());
+                    pendingRequests.remove(targetUuid);
                 }
                 return true;
             }
@@ -239,11 +252,15 @@ public class PrivacyManager {
     }
 
     private synchronized boolean isOnRequestCooldown(Player peeker, Player target) {
-        if (!cooldownEnabled || peeker.hasPermission("peek.nocooldown")) {
+        return isOnRequestCooldown(peeker.getUniqueId(), target.getUniqueId(), peeker.hasPermission("peek.nocooldown"));
+    }
+
+    private synchronized boolean isOnRequestCooldown(UUID peekerUuid, UUID targetUuid, boolean bypassCooldown) {
+        if (!cooldownEnabled || bypassCooldown) {
             return false;
         }
 
-        String key = getCooldownKey(peeker.getUniqueId(), target.getUniqueId());
+        String key = getCooldownKey(peekerUuid, targetUuid);
         Long lastRequest = requestCooldowns.get(key);
         if (lastRequest == null) {
             return false;
@@ -258,11 +275,16 @@ public class PrivacyManager {
     }
 
     private synchronized int getRemainingRequestCooldown(Player peeker, Player target) {
-        if (!cooldownEnabled || peeker.hasPermission("peek.nocooldown")) {
+        return getRemainingRequestCooldown(peeker.getUniqueId(), target.getUniqueId(),
+                peeker.hasPermission("peek.nocooldown"));
+    }
+
+    private synchronized int getRemainingRequestCooldown(UUID peekerUuid, UUID targetUuid, boolean bypassCooldown) {
+        if (!cooldownEnabled || bypassCooldown) {
             return 0;
         }
 
-        String key = getCooldownKey(peeker.getUniqueId(), target.getUniqueId());
+        String key = getCooldownKey(peekerUuid, targetUuid);
         Long lastRequest = requestCooldowns.get(key);
         if (lastRequest == null) {
             return 0;
@@ -312,8 +334,8 @@ public class PrivacyManager {
         // 获取第一个请求者
         Map.Entry<UUID, ScheduledTask> entry = requests.entrySet().iterator().next();
         Player peeker = plugin.getServer().getPlayer(entry.getKey());
-        if (peeker == null || !peeker.isOnline()) {
-            removePendingRequest(peeker, player);
+        if (peeker == null) {
+            removePendingRequest(entry.getKey(), playerUuid);
             plugin.getMessages().send(player, "request-expired");
             return;
         }
@@ -333,10 +355,10 @@ public class PrivacyManager {
         // 获取第一个请求者
         Map.Entry<UUID, ScheduledTask> entry = requests.entrySet().iterator().next();
         Player peeker = plugin.getServer().getPlayer(entry.getKey());
-        if (peeker != null && peeker.isOnline()) {
+        if (peeker != null) {
             handleRequestResponse(player, peeker, false);
         } else {
-            removePendingRequest(peeker, player);
+            removePendingRequest(entry.getKey(), playerUuid);
             plugin.getMessages().send(player, "request-expired");
         }
     }
@@ -350,5 +372,9 @@ public class PrivacyManager {
         if (cancelOutgoingRequests(peeker.getUniqueId(), "request-cancelled-death-target")) {
             plugin.getMessages().send(peeker, "request-cancelled-death");
         }
+    }
+
+    private void runForPlayer(Player player, Runnable action) {
+        FoliaSchedulerUtil.runOnEntity(plugin, player, action, null);
     }
 }

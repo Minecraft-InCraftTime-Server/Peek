@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
+import ict.minesunshineone.peek.util.FoliaSchedulerUtil;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 /**
@@ -59,22 +60,10 @@ public class RangeChecker {
                             return;
                         }
 
-                        // 检查目标是否离线
-                        if (!target.isOnline()) {
-                            onTargetOffline.run();
-                            return;
-                        }
-
-                        if (peeker.getWorld().equals(target.getWorld())) {
-                            double distance = peeker.getLocation().distance(target.getLocation());
-                            onDistanceUpdate.accept(distance);
-                            if (distance > maxPeekDistance) {
-                                onRangeExceeded.run();
-                            }
-                        } else {
-                            // 跨维度
-                            onDifferentWorld.run();
-                        }
+                        snapshotTargetLocation(target,
+                                targetLocation -> checkNormalPeekDistance(peeker, targetLocation, onRangeExceeded,
+                                        onDistanceUpdate, onDifferentWorld),
+                                onTargetOffline);
                     },
                     () -> {
                         // 实体调度器退役 -> 观察者已经离线
@@ -96,6 +85,41 @@ public class RangeChecker {
             // 实体调度器退役 -> 观察者已经离线
             onTargetOffline.run();
         }
+    }
+
+    private void snapshotTargetLocation(Player target, Consumer<Location> onSnapshot, Runnable onTargetUnavailable) {
+        FoliaSchedulerUtil.runOnEntity(plugin, target, () -> {
+            if (!target.isOnline()) {
+                onTargetUnavailable.run();
+                return;
+            }
+
+            onSnapshot.accept(target.getLocation().clone());
+        }, onTargetUnavailable);
+    }
+
+    private void checkNormalPeekDistance(Player peeker,
+            Location targetLocation,
+            Runnable onRangeExceeded,
+            Consumer<Double> onDistanceUpdate,
+            Runnable onDifferentWorld) {
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> {
+            if (!peeker.isOnline() || peeker.isDead()) {
+                return;
+            }
+
+            Location peekerLocation = peeker.getLocation();
+            if (peekerLocation.getWorld() != null && peekerLocation.getWorld().equals(targetLocation.getWorld())) {
+                double distance = peekerLocation.distance(targetLocation);
+                onDistanceUpdate.accept(distance);
+                if (distance > maxPeekDistance) {
+                    onRangeExceeded.run();
+                }
+            } else {
+                // 跨维度
+                onDifferentWorld.run();
+            }
+        }, () -> logDebug("Peeker %s's entity scheduler retired during range check", peeker.getName()));
     }
 
     /**

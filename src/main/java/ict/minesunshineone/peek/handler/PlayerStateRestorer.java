@@ -9,6 +9,7 @@ import org.bukkit.util.Vector;
 
 import ict.minesunshineone.peek.PeekPlugin;
 import ict.minesunshineone.peek.data.PeekData;
+import ict.minesunshineone.peek.util.FoliaSchedulerUtil;
 import ict.minesunshineone.peek.util.PlayerStateUtil;
 
 /**
@@ -55,7 +56,7 @@ public class PlayerStateRestorer {
      * @param onFailed    传送失败时的回退逻辑
      */
     private void teleportThenRestore(Player peeker, Location destination, PeekData data, Runnable onFailed) {
-        final boolean scheduled = peeker.getScheduler().execute(plugin, () -> {
+        FoliaSchedulerUtil.executeOnEntity(plugin, peeker, () -> {
             try {
                 // 强制清理骑乘/附身状态并清除动量，保证传送干净
                 PlayerStateUtil.forceExitRidingState(peeker);
@@ -64,16 +65,16 @@ public class PlayerStateRestorer {
                 peeker.teleportAsync(destination, TeleportCause.PLUGIN).thenAccept(success -> {
                     if (success) {
                         // teleportAsync 回调线程不确定，使用实体调度器确保线程安全
-                        peeker.getScheduler().run(plugin,
-                                scheduledTask -> applyRestoredState(peeker, data),
+                        FoliaSchedulerUtil.runOnEntity(plugin, peeker,
+                                () -> applyRestoredState(peeker, data),
                                 () -> plugin.getLogger().warning(
                                         String.format("玩家 %s 在传送恢复后离线", peeker.getName())));
                     } else {
-                        onFailed.run();
+                        runFailureOnPeekerThread(peeker, onFailed);
                     }
                 }).exceptionally(ex -> {
                     plugin.getLogger().warning(String.format("恢复玩家 %s 传送时发生异常: %s", peeker.getName(), ex.getMessage()));
-                    onFailed.run();
+                    runFailureOnPeekerThread(peeker, onFailed);
                     return null;
                 });
             } catch (Throwable t) {
@@ -81,11 +82,14 @@ public class PlayerStateRestorer {
                 plugin.getLogger().warning(String.format("恢复玩家 %s 传送时同步异常: %s", peeker.getName(), t.getMessage()));
                 onFailed.run();
             }
-        }, onFailed, 1L);
+        }, () -> plugin.getLogger().warning(
+                String.format("玩家 %s 在状态恢复前离线", peeker.getName())), 1L);
+    }
 
-        if (!scheduled) {
-            onFailed.run();
-        }
+    private void runFailureOnPeekerThread(Player peeker, Runnable onFailed) {
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, onFailed,
+                () -> plugin.getLogger().warning(
+                        String.format("玩家 %s 在传送失败处理前离线", peeker.getName())));
     }
 
     /**
@@ -95,6 +99,12 @@ public class PlayerStateRestorer {
      * @param data   PeekData 数据
      */
     public void handleTeleportFailure(Player peeker, PeekData data) {
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> handleTeleportFailureOnPlayerThread(peeker, data),
+                () -> plugin.getLogger().warning(
+                        String.format("玩家 %s 在传送失败回退前离线", peeker.getName())));
+    }
+
+    private void handleTeleportFailureOnPlayerThread(Player peeker, PeekData data) {
         plugin.getLogger().warning(String.format(
                 "无法将玩家 %s 传送回原位置，正在尝试传送到重生点",
                 peeker.getName()));
@@ -143,15 +153,10 @@ public class PlayerStateRestorer {
     public void forceStateRestoreWithoutTeleport(Player peeker, PeekData data) {
         // 可能从 teleportAsync 回调（线程不确定）调用
         // 使用实体调度器确保在正确的区域线程上执行
-        if (peeker.isOnline()) {
-            peeker.getScheduler().run(plugin,
-                    scheduledTask -> applyRestoredState(peeker, data),
-                    () -> plugin.getLogger().warning(
-                            String.format("玩家 %s 在强制恢复状态时离线", peeker.getName())));
-        } else {
-            plugin.getLogger().warning(
-                    String.format("玩家 %s 已离线，无法强制恢复状态", peeker.getName()));
-        }
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker,
+                () -> applyRestoredState(peeker, data),
+                () -> plugin.getLogger().warning(
+                        String.format("玩家 %s 在强制恢复状态时离线", peeker.getName())));
     }
 
     /**

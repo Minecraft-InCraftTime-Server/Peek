@@ -11,7 +11,7 @@ import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 
 import ict.minesunshineone.peek.PeekPlugin;
-import ict.minesunshineone.peek.data.PeekData;
+import ict.minesunshineone.peek.util.FoliaSchedulerUtil;
 
 /**
  * 负责管理 Peek 模式下的 BossBar 显示
@@ -71,15 +71,15 @@ public class BossBarHandler {
      * 为观察者创建距离显示 BossBar
      * 
      * @param peeker 观察者
-     * @param target 目标玩家
+     * @param targetName 目标玩家名称
      */
-    public void createDistanceBossBar(Player peeker, Player target) {
+    public void createDistanceBossBar(Player peeker, String targetName) {
         if (!enabled)
             return;
 
         removeDistanceBossBar(peeker); // 确保没有残留
 
-        String title = formatBossBarTitle(target.getName(), 0.0);
+        String title = formatBossBarTitle(targetName, 0.0);
         BossBar bar = Bukkit.createBossBar(
                 title,
                 colorSafe,
@@ -87,7 +87,7 @@ public class BossBarHandler {
         bar.setProgress(0.0);
         bar.addPlayer(peeker);
         distanceBossBars.put(peeker.getUniqueId(), bar);
-        logDebug("Created BossBar for player %s, target: %s", peeker.getName(), target.getName());
+        logDebug("Created BossBar for player %s, target: %s", peeker.getName(), targetName);
     }
 
     /**
@@ -154,22 +154,6 @@ public class BossBarHandler {
     }
 
     /**
-     * 更新观察者的距离 BossBar（从 PeekData 获取目标信息）
-     * 
-     * @param peeker   观察者
-     * @param distance 当前距离
-     * @param data     PeekData 数据
-     */
-    public void updateDistanceBossBar(Player peeker, double distance, PeekData data) {
-        if (!enabled || data == null)
-            return;
-
-        Player target = plugin.getServer().getPlayer(data.getTargetUUID());
-        String targetName = target != null ? target.getName() : "未知";
-        updateDistanceBossBar(peeker, distance, targetName);
-    }
-
-    /**
      * 移除观察者的距离 BossBar
      * 
      * @param peeker 观察者
@@ -193,11 +177,8 @@ public class BossBarHandler {
             return;
         }
 
-        if (peeker.isOnline()) {
-            peeker.getScheduler().run(plugin, scheduledTask -> removeDistanceBossBar(peeker), null);
-        } else {
-            removeDistanceBossBar(peeker);
-        }
+        FoliaSchedulerUtil.runOnEntity(plugin, peeker, () -> removeDistanceBossBar(peeker),
+                () -> removeDistanceBossBar(peeker));
     }
 
     /**
